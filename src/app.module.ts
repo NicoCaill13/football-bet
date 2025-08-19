@@ -8,6 +8,10 @@ import { DecisionModule } from "./decision/decision.module";
 import { EloModule } from "./elo/elo.module";
 import { XgModule } from "./xg/xg.module";
 import { InjuriesModule } from "./injuries/injuries.module";
+import { CompetitionsModule } from "./competitions/competitions.module";
+import { FixturesModule } from "./fixtures/fixtures.module";
+import { ImportModule } from "./import/import.module";
+
 
 @Module({
   imports: [
@@ -20,6 +24,9 @@ import { InjuriesModule } from "./injuries/injuries.module";
     XgModule,
     InjuriesModule,
     DecisionModule,
+    CompetitionsModule,
+    FixturesModule,
+    ImportModule
   ],
 })
 export class AppModule {}

@@ -13,7 +13,7 @@ export class MatchesService {
         homeTeamId: dto.homeTeamId,
         awayTeamId: dto.awayTeamId,
         startsAt: new Date(dto.startsAt),
-        competition: dto.competition,
+        competitionName: dto.competition,
         venue: dto.venue,
       },
     });
@@ -42,7 +42,7 @@ export class MatchesService {
         homeTeamId: dto.homeTeamId,
         awayTeamId: dto.awayTeamId,
         startsAt: dto.startsAt ? new Date(dto.startsAt) : undefined,
-        competition: dto.competition,
+        competitionName: dto.competition,
         venue: dto.venue,
       },
     });

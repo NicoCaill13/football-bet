@@ -18,7 +18,7 @@ async function main() {
   // Example match (update date as needed)
   const m = await prisma.match.create({
     data: {
-      competition: "Ligue 1",
+      competitionName: "Ligue 1",
       venue: "Decathlon Arena – Pierre-Mauroy",
       startsAt: new Date("2025-08-24T18:45:00.000Z"), // 20:45 CEST
       homeTeamId: lille.id,
