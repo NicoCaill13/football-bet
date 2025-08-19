@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Team {
+  id           Int       @id @default(autoincrement())
+  name         String
+  country      String?
+  slug         String    @unique
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  matchesHome  Match[]   @relation("HomeTeam")
+  matchesAway  Match[]   @relation("AwayTeam")
+  eloRatings   EloRating[]
+  xgRollings   XgTeamRolling[]
+  injuries     InjuryReport[]
+}
+
+model Match {
+  id         Int       @id @default(autoincrement())
+  extId      String?   @unique
+  competition String?
+  venue      String?
+  startsAt   DateTime
+  status     String    @default("scheduled")
+
+  homeTeamId Int
+  awayTeamId Int
+  homeTeam   Team      @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam   Team      @relation("AwayTeam", fields: [awayTeamId], references: [id])
+
+  odds       Odds[]
+  weather    WeatherSnapshot?
+  decisions  DecisionLog[]
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([startsAt])
+}
+
+model Odds {
+  id        Int      @id @default(autoincrement())
+  matchId   Int
+  book      String
+  o1        Float    // Home win
+  oX        Float    // Draw
+  o2        Float    // Away win
+  sampledAt DateTime @default(now())
+  match     Match    @relation(fields: [matchId], references: [id])
+
+  @@index([matchId, book, sampledAt])
+}
+
+model EloRating {
+  id       Int      @id @default(autoincrement())
+  teamId   Int
+  rating   Int
+  source   String   // e.g., "clubelo"
+  ratedAt  DateTime @default(now())
+  team     Team     @relation(fields: [teamId], references: [id])
+
+  @@index([teamId, ratedAt])
+}
+
+model XgTeamRolling {
+  id         Int      @id @default(autoincrement())
+  teamId     Int
+  span       String   // e.g., "5m" or "10m"
+  xgFor      Float
+  xgAgainst  Float
+  updatedAt  DateTime @default(now())
+  team       Team     @relation(fields: [teamId], references: [id])
+
+  @@unique([teamId, span])
+}
+
+model InjuryReport {
+  id         Int      @id @default(autoincrement())
+  teamId     Int
+  player     String
+  status     String   // out | doubt | fit
+  reportedAt DateTime @default(now())
+  source     String?
+  team       Team     @relation(fields: [teamId], references: [id])
+
+  @@index([teamId, reportedAt])
+}
+
+model WeatherSnapshot {
+  id        Int      @id @default(autoincrement())
+  matchId   Int      @unique
+  tempC     Float?
+  windKph   Float?
+  precipMm  Float?
+  updatedAt DateTime @default(now())
+  match     Match    @relation(fields: [matchId], references: [id])
+}
+
+model DecisionLog {
+  id        Int      @id @default(autoincrement())
+  matchId   Int
+  payload   Json
+  createdAt DateTime @default(now())
+  match     Match    @relation(fields: [matchId], references: [id])
+
+  @@index([matchId, createdAt])
+}
