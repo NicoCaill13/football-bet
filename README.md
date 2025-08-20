@@ -96,7 +96,7 @@ curl -s -X POST "http://localhost:3000/import/football-data/PL/2025"  | jq  # Pr
 curl -s -X POST "http://localhost:3000/import/football-data/SA/2025"  | jq  # Serie A
 curl -s -X POST "http://localhost:3000/import/football-data/PD/2025"  | jq  # LaLiga
 curl -s -X POST "http://localhost:3000/import/football-data/BL1/2025" | jq  # Bundesliga
-curl -s -X POST "http://localhost:3000/import/football-data/FL1/2025" | jq  # Ligue 1 (alternative générique)
+curl -s -X POST "http://localhost:3000/import/football-data/FL1/2025" | jq  # Ligue 1
 
 # COUPES NATIONALES
 curl -s -X POST "http://localhost:3000/import/football-data/FAC/2025" | jq  # FA Cup

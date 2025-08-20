@@ -8,66 +8,155 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum CompetitionType {
+  league
+  cup
+  europe
+}
+
+enum ChangeType {
+  reschedule
+  postpone
+  cancel
+  venue
+}
+
+model Competition {
+  id        Int             @id @default(autoincrement())
+  name      String
+  code      String?         @unique
+  country   String?
+  type      CompetitionType
+  organizer String?
+  createdAt DateTime        @default(now())
+
+  seasons Season[] @relation("CompetitionSeasons")
+  matches Match[]  @relation("CompetitionMatches")
+
+  // API-FOOTBALL
+  afLeagueId Int? @unique
+}
+
+model Season {
+  id            Int         @id @default(autoincrement())
+  competitionId Int
+  label         String
+  startDate     DateTime?
+  endDate       DateTime?
+  competition   Competition @relation("CompetitionSeasons", fields: [competitionId], references: [id])
+  rounds        Round[]
+  matches       Match[]
+
+  // API-FOOTBALL
+  afSeasonYear Int?
+
+  @@index([competitionId])
+}
+
+model Round {
+  id       Int     @id @default(autoincrement())
+  seasonId Int
+  name     String
+  roundNo  Int?
+  leg      Int? // null pour championnat
+  season   Season  @relation(fields: [seasonId], references: [id])
+  matches  Match[]
+
+  @@unique([seasonId, name, leg])
+}
+
 model Team {
-  id          Int             @id @default(autoincrement())
-  name        String
-  country     String?
-  slug        String          @unique
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  matchesHome Match[]         @relation("HomeTeam")
-  matchesAway Match[]         @relation("AwayTeam")
+  id        Int      @id @default(autoincrement())
+  slug      String   @unique
+  name      String
+  country   String?
+  createdAt DateTime @default(now())
+
+  // API-FOOTBALL
+  afTeamId    Int?            @unique
+  homeMatches Match[]         @relation("HomeTeam")
+  awayMatches Match[]         @relation("AwayTeam")
   eloRatings  EloRating[]
   xgRollings  XgTeamRolling[]
   injuries    InjuryReport[]
+
+  // relations implicites via Match.homeTeam/awayTeam
 }
 
 model Match {
   id              Int      @id @default(autoincrement())
   extId           String?  @unique
   competitionName String?  @map("competition")
-  venue           String?
   startsAt        DateTime
   status          String   @default("scheduled")
+  venue           String?
+
+  // Relations
+  competitionId Int?
+  competition   Competition? @relation("CompetitionMatches", fields: [competitionId], references: [id])
+
+  seasonId Int?
+  season   Season? @relation(fields: [seasonId], references: [id])
+
+  roundId Int?
+  round   Round? @relation(fields: [roundId], references: [id])
 
   homeTeamId Int
-  awayTeamId Int
   homeTeam   Team @relation("HomeTeam", fields: [homeTeamId], references: [id])
+
+  awayTeamId Int
   awayTeam   Team @relation("AwayTeam", fields: [awayTeamId], references: [id])
 
-  odds           Odds[]
-  weather        WeatherSnapshot?
-  decisions      DecisionLog[]
-  fixtureChanges FixtureChangeLog[] @relation("MatchFixtureChanges")
+  afFixtureId Int? @unique
 
-  competitionId Int?
-  seasonId      Int?
-  roundId       Int?
-  competition   Competition? @relation("CompetitionMatches", fields: [competitionId], references: [id])
-  season        Season?      @relation(fields: [seasonId], references: [id])
-  round         Round?       @relation(fields: [roundId], references: [id])
+  odds            Odds[]
+  decisionLogs    DecisionLog[]      @relation("MatchDecisionLogs")
+  fixtureChanges  FixtureChangeLog[] @relation("MatchFixtureChanges")
+  WeatherSnapshot WeatherSnapshot?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([seasonId, homeTeamId, awayTeamId, startsAt])
+  @@index([startsAt])
   @@index([homeTeamId, startsAt])
   @@index([awayTeamId, startsAt])
   @@index([competitionId, seasonId, roundId])
-  @@index([startsAt])
 }
 
 model Odds {
   id        Int      @id @default(autoincrement())
   matchId   Int
   book      String
-  o1        Float // Home win
-  oX        Float // Draw
-  o2        Float // Away win
+  o1        Float
+  oX        Float
+  o2        Float
   sampledAt DateTime @default(now())
   match     Match    @relation(fields: [matchId], references: [id])
 
-  @@index([matchId, book, sampledAt])
+  @@index([matchId, sampledAt])
+}
+
+model DecisionLog {
+  id        Int      @id @default(autoincrement())
+  matchId   Int
+  payload   Json
+  createdAt DateTime @default(now())
+  match     Match    @relation("MatchDecisionLogs", fields: [matchId], references: [id])
+
+  @@index([matchId, createdAt])
+}
+
+model FixtureChangeLog {
+  id        Int       @id @default(autoincrement())
+  matchId   Int
+  type      String
+  from      DateTime?
+  to        DateTime?
+  note      String?
+  createdAt DateTime  @default(now())
+  match     Match     @relation("MatchFixtureChanges", fields: [matchId], references: [id])
+
+  @@index([matchId, createdAt])
 }
 
 model EloRating {
@@ -113,91 +202,4 @@ model WeatherSnapshot {
   precipMm  Float?
   updatedAt DateTime @default(now())
   match     Match    @relation(fields: [matchId], references: [id])
-}
-
-model DecisionLog {
-  id        Int      @id @default(autoincrement())
-  matchId   Int
-  payload   Json
-  createdAt DateTime @default(now())
-  match     Match    @relation(fields: [matchId], references: [id])
-
-  @@index([matchId, createdAt])
-}
-
-// --- Enums
-enum CompetitionType {
-  league
-  cup
-  europe
-}
-
-enum ChangeType {
-  reschedule
-  postpone
-  cancel
-  venue
-}
-
-// --- Nouvelles tables
-model Competition {
-  id        Int             @id @default(autoincrement())
-  name      String
-  code      String?
-  country   String?
-  type      CompetitionType
-  organizer String?
-  createdAt DateTime        @default(now())
-
-  // 🔁 relations opposées nommées
-  seasons Season[] @relation("CompetitionSeasons")
-  matches Match[]  @relation("CompetitionMatches")
-}
-
-model Season {
-  id            Int       @id @default(autoincrement())
-  competitionId Int
-  label         String
-  startDate     DateTime?
-  endDate       DateTime?
-
-  competition Competition @relation("CompetitionSeasons", fields: [competitionId], references: [id])
-  rounds      Round[]
-  matches     Match[]
-
-  @@index([competitionId])
-}
-
-model Round {
-  id        Int       @id @default(autoincrement())
-  seasonId  Int
-  name      String // "Matchday 3", "Quarterfinal"
-  roundNo   Int?
-  stage     String? // "Group A", "R16"
-  leg       Int? // 1/2
-  startDate DateTime?
-  endDate   DateTime?
-  season    Season    @relation(fields: [seasonId], references: [id])
-  matches   Match[]
-
-  @@unique([seasonId, name, leg])
-  @@index([seasonId])
-}
-
-model FixtureChangeLog {
-  id           Int        @id @default(autoincrement())
-  matchId      Int
-  changeType   ChangeType
-  prevStartsAt DateTime?
-  newStartsAt  DateTime?
-  prevVenue    String?
-  newVenue     String?
-  reason       String?
-  sourceUrl    String?
-  createdAt    DateTime   @default(now())
-
-  // 🔗 relation nommée vers Match
-  match Match @relation("MatchFixtureChanges", fields: [matchId], references: [id])
-
-  @@index([matchId, createdAt])
 }

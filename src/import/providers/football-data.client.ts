@@ -5,6 +5,7 @@ export type FdMatch = {
   utcDate: string;          // "2025-08-17T18:45:00Z"
   status: string;           // SCHEDULED|POSTPONED|FINISHED...
   matchday: number | null;  // 1..N
+  stage?: string | null; 
   venue?: string | null;
   homeTeam: { id: number; name: string };
   awayTeam: { id: number; name: string };

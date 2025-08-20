@@ -1,8 +1,9 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsString } from "class-validator";
+import { ApiPropertyOptional } from "@nestjs/swagger";
+import { IsOptional, IsString } from "class-validator";
 
 export class UpdateVenueDto {
-  @ApiProperty({ example: "Allianz Riviera" }) @IsString() venue!: string;
-  @ApiProperty({ example: "Stadium unavailable" }) @IsString() reason!: string;
+  @ApiPropertyOptional({ description: "Note (raison, source...)" })
+  @IsOptional()
+  @IsString()
+  note?: string;
 }
-

@@ -1,48 +1,53 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { CreateFixtureDto } from "./dto/create-fixture.dto";
 import { RescheduleDto } from "./dto/reschedule.dto";
 import { PostponeDto } from "./dto/postpone.dto";
 import { CancelDto } from "./dto/cancel.dto";
 import { UpdateVenueDto } from "./dto/update-venue.dto";
 
+export type CreateFixtureDto = {
+  seasonId: number;
+  homeTeamId: number;
+  awayTeamId: number;
+  startsAt: string;
+  competitionId?: number;
+  roundId?: number;
+  status?: string;
+  venue?: string;
+  afFixtureId?: number;
+};
+
 @Injectable()
 export class FixturesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async createFixture(dto: CreateFixtureDto) {
-    if (dto.homeTeamId === dto.awayTeamId) {
-      throw new Error("homeTeamId cannot equal awayTeamId");
-    }
+  /** ====== Implémentations principales ====== */
 
-    // Récup competition depuis la saison (pour filtrage ultérieur)
-    const season = await this.prisma.season.findUnique({ where: { id: dto.seasonId }, include: { competition: true } });
-    if (!season) throw new NotFoundException("Season not found");
-
-    const match = await this.prisma.match.create({
+  async create(dto: CreateFixtureDto) {
+    return this.prisma.match.create({
       data: {
-        seasonId: dto.seasonId,
-        competitionId: season.competitionId,
-        roundId: dto.roundId,
-        homeTeamId: dto.homeTeamId,
-        awayTeamId: dto.awayTeamId,
+        season: { connect: { id: dto.seasonId } },
+        homeTeam: { connect: { id: dto.homeTeamId } },
+        awayTeam: { connect: { id: dto.awayTeamId } },
         startsAt: new Date(dto.startsAt),
-        venue: dto.venue,
-        status: "scheduled",
+        status: dto.status ?? "scheduled",
+        venue: dto.venue ?? undefined,
+        ...(dto.roundId ? { round: { connect: { id: dto.roundId } } } : {}),
+        ...(dto.competitionId ? { competition: { connect: { id: dto.competitionId } } } : {}),
+        ...(dto.afFixtureId ? { afFixtureId: dto.afFixtureId } : {}),
       },
       include: { homeTeam: true, awayTeam: true, competition: true, season: true, round: true },
     });
-    return match;
   }
 
-  getFixture(id: number) {
+  async get(id: number) {
     return this.prisma.match.findUnique({
       where: { id },
       include: { homeTeam: true, awayTeam: true, competition: true, season: true, round: true },
     });
   }
 
-  listCompetitionFixtures(competitionId: number) {
+  async byCompetition(competitionId: number) {
     return this.prisma.match.findMany({
       where: { competitionId },
       orderBy: { startsAt: "asc" },
@@ -50,7 +55,7 @@ export class FixturesService {
     });
   }
 
-  listSeasonFixtures(seasonId: number) {
+  async bySeason(seasonId: number) {
     return this.prisma.match.findMany({
       where: { seasonId },
       orderBy: { startsAt: "asc" },
@@ -58,100 +63,47 @@ export class FixturesService {
     });
   }
 
-  async reschedule(id: number, dto: RescheduleDto) {
-    const m = await this.prisma.match.findUnique({ where: { id } });
-    if (!m) throw new NotFoundException("Fixture not found");
-
-    const prevStartsAt = m.startsAt;
-    const newStartsAt = new Date(dto.newStartsAt);
-
-    const updated = await this.prisma.match.update({
-      where: { id },
-      data: { startsAt: newStartsAt, status: "rescheduled" },
-    });
-
-    await this.prisma.fixtureChangeLog.create({
-      data: {
-        matchId: id,
-        changeType: "reschedule",
-        prevStartsAt,
-        newStartsAt,
-        reason: dto.reason,
-        sourceUrl: dto.sourceUrl,
-      },
-    });
-
-    return updated;
+  async logReschedule(matchId: number, from: Date, to: Date, note?: string) {
+    await this.prisma.fixtureChangeLog.create({ data: { matchId, type: "reschedule", from, to, note } });
+    return { ok: true };
+  }
+  async logPostpone(matchId: number, from: Date, note?: string) {
+    await this.prisma.fixtureChangeLog.create({ data: { matchId, type: "postpone", from, note } });
+    return { ok: true };
+  }
+  async logCancel(matchId: number, from: Date, note?: string) {
+    await this.prisma.fixtureChangeLog.create({ data: { matchId, type: "cancel", from, note } });
+    return { ok: true };
+  }
+  async logVenueChange(matchId: number, note?: string) {
+    await this.prisma.fixtureChangeLog.create({ data: { matchId, type: "venue", note } });
+    return { ok: true };
   }
 
-  async postpone(id: number, dto: PostponeDto) {
-    const m = await this.prisma.match.findUnique({ where: { id } });
-    if (!m) throw new NotFoundException("Fixture not found");
-
-    const updated = await this.prisma.match.update({
-      where: { id },
-      data: { status: "postponed" },
-    });
-
-    await this.prisma.fixtureChangeLog.create({
-      data: {
-        matchId: id,
-        changeType: "postpone",
-        prevStartsAt: m.startsAt,
-        reason: dto.reason,
-        sourceUrl: dto.sourceUrl,
-      },
-    });
-
-    return updated;
+  async history(matchId: number) {
+    return this.prisma.fixtureChangeLog.findMany({ where: { matchId }, orderBy: { createdAt: "desc" } });
   }
 
-  async cancel(id: number, dto: CancelDto) {
-    const m = await this.prisma.match.findUnique({ where: { id } });
-    if (!m) throw new NotFoundException("Fixture not found");
+  /** ====== Wrappers attendus par le controller ====== */
 
-    const updated = await this.prisma.match.update({
-      where: { id },
-      data: { status: "canceled" },
-    });
+  createFixture(dto: CreateFixtureDto) { return this.create(dto); }
+  getFixture(id: number) { return this.get(id); }
+  listCompetitionFixtures(competitionId: number) { return this.byCompetition(competitionId); }
+  listSeasonFixtures(seasonId: number) { return this.bySeason(seasonId); }
 
-    await this.prisma.fixtureChangeLog.create({
-      data: {
-        matchId: id,
-        changeType: "cancel",
-        prevStartsAt: m.startsAt,
-        reason: dto.reason,
-        sourceUrl: dto.sourceUrl,
-      },
-    });
-
-    return updated;
+  reschedule(id: number, dto: RescheduleDto) {
+    return this.logReschedule(id, new Date(dto.from), new Date(dto.to), dto.note);
   }
-
-  async changeVenue(id: number, dto: UpdateVenueDto) {
-    const m = await this.prisma.match.findUnique({ where: { id } });
-    if (!m) throw new NotFoundException("Fixture not found");
-
-    const updated = await this.prisma.match.update({
-      where: { id },
-      data: { venue: dto.venue },
-    });
-
-    await this.prisma.fixtureChangeLog.create({
-      data: {
-        matchId: id,
-        changeType: "venue",
-        prevVenue: m.venue ?? undefined,
-        newVenue: dto.venue,
-        reason: dto.reason,
-      },
-    });
-
-    return updated;
+  postpone(id: number, dto: PostponeDto) {
+    return this.logPostpone(id, new Date(dto.from), dto.note);
   }
-
+  cancel(id: number, dto: CancelDto) {
+    return this.logCancel(id, new Date(dto.from), dto.note);
+  }
+  changeVenue(id: number, dto: UpdateVenueDto) {
+    return this.logVenueChange(id, dto.note);
+  }
   changeLog(id: number) {
-    return this.prisma.fixtureChangeLog.findMany({ where: { matchId: id }, orderBy: { createdAt: "desc" } });
+    return this.history(id);
   }
 }
-

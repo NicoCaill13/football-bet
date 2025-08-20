@@ -1,27 +1,21 @@
-// src/matches/dto/create-match.dto.ts
-import { ApiProperty } from "@nestjs/swagger";
-import { IsDateString, IsInt, IsOptional, IsString } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsDateString, IsInt, IsOptional, IsPositive, IsString } from "class-validator";
 
 export class CreateMatchDto {
-  @ApiProperty()
-  @IsInt()
-  homeTeamId!: number;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @IsPositive() competitionId?: number;
+  @ApiPropertyOptional({ description: "Code/nom compétition si pas d'ID" })
+  @IsOptional() @IsString() competition?: string;
 
-  @ApiProperty()
-  @IsInt()
-  awayTeamId!: number;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @IsPositive() seasonId?: number;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @IsPositive() roundId?: number;
 
-  @ApiProperty({ example: "2025-08-24T18:45:00.000Z" })
-  @IsDateString()
-  startsAt!: string;
+  @ApiProperty() @IsInt() @IsPositive() homeTeamId!: number;
+  @ApiProperty() @IsInt() @IsPositive() awayTeamId!: number;
 
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  competition?: string;
+  @ApiProperty() @IsDateString() startsAt!: string;
 
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  venue?: string;
+  @ApiPropertyOptional({ default: "scheduled" }) @IsOptional() @IsString() status?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() venue?: string | null;
+
+  @ApiPropertyOptional() @IsOptional() @IsInt() @IsPositive() afFixtureId?: number;
 }

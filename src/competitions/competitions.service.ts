@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateCompetitionDto } from "./dto/create-competition.dto";
 import { CreateSeasonDto } from "./dto/create-season.dto";
@@ -6,10 +7,17 @@ import { CreateRoundDto } from "./dto/create-round.dto";
 
 @Injectable()
 export class CompetitionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   createCompetition(dto: CreateCompetitionDto) {
-    return this.prisma.competition.create({ data: dto });
+    const data: Prisma.CompetitionCreateInput = {
+      name: dto.name,
+      code: dto.code ?? null,
+      country: dto.country ?? null,
+      type: dto.type as any, // ✅ littéral "league" | "cup" | "europe"
+      organizer: dto.organizer ?? null,
+    };
+    return this.prisma.competition.create({ data });
   }
 
   listCompetitions() {
@@ -19,10 +27,11 @@ export class CompetitionsService {
   createSeason(dto: CreateSeasonDto) {
     return this.prisma.season.create({
       data: {
-        competitionId: dto.competitionId,
+        competition: { connect: { id: dto.competitionId } },
         label: dto.label,
         startDate: dto.startDate ? new Date(dto.startDate) : undefined,
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+        ...(dto.afSeasonYear !== undefined ? { afSeasonYear: dto.afSeasonYear } : {}),
       },
     });
   }
@@ -31,24 +40,20 @@ export class CompetitionsService {
     return this.prisma.season.findMany({ where: { competitionId }, orderBy: { id: "desc" } });
   }
 
-  async createRound(dto: CreateRoundDto) {
-    const s = await this.prisma.season.findUnique({ where: { id: dto.seasonId } });
-    if (!s) throw new NotFoundException("Season not found");
-    return this.prisma.round.create({
-      data: {
-        seasonId: dto.seasonId,
-        name: dto.name,
-        roundNo: dto.roundNo,
-        stage: dto.stage,
-        leg: dto.leg,
-        startDate: dto.startDate ? new Date(dto.startDate) : undefined,
-        endDate: dto.endDate ? new Date(dto.endDate) : undefined,
-      },
-    });
+  createRound(dto: CreateRoundDto) {
+    const data: Prisma.RoundUncheckedCreateInput = {
+      seasonId: dto.seasonId,
+      name: dto.name ?? (dto.roundNo ? `Matchday ${dto.roundNo}` : "Round"),
+      roundNo: dto.roundNo ?? null,
+      leg: dto.leg ?? null,
+    };
+    return this.prisma.round.create({ data });
   }
 
   listRounds(seasonId: number) {
-    return this.prisma.round.findMany({ where: { seasonId }, orderBy: [{ roundNo: "asc" }, { id: "asc" }] });
+    return this.prisma.round.findMany({
+      where: { seasonId },
+      orderBy: [{ roundNo: "asc" }, { id: "asc" }],
+    });
   }
 }
-

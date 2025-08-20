@@ -1,13 +1,11 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsDateString, IsInt, IsOptional, IsString } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsInt, IsOptional, IsPositive, IsString } from "class-validator";
 
 export class CreateRoundDto {
-  @ApiProperty({ example: 1 }) @IsInt() seasonId!: number;
-  @ApiProperty({ example: "Matchday 3" }) @IsString() name!: string;
-  @ApiProperty({ required: false, example: 3 }) @IsOptional() @IsInt() roundNo?: number;
-  @ApiProperty({ required: false, example: "Group A" }) @IsOptional() @IsString() stage?: string;
-  @ApiProperty({ required: false, example: 1 }) @IsOptional() @IsInt() leg?: number;
-  @ApiProperty({ required: false, example: "2025-09-10T00:00:00.000Z" }) @IsOptional() @IsDateString() startDate?: string;
-  @ApiProperty({ required: false, example: "2025-09-16T00:00:00.000Z" }) @IsOptional() @IsDateString() endDate?: string;
+  @ApiProperty() @IsInt() @IsPositive() seasonId!: number;
+  @ApiPropertyOptional({ description: "Nom affiché (ex: Matchday 5 / Quarter-finals)" })
+  @IsOptional() @IsString() name?: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() roundNo?: number;
+  @ApiPropertyOptional({ description: "Manches pour coupes (1,2...); null pour championnat" })
+  @IsOptional() @IsInt() leg?: number;
 }
-
