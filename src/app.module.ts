@@ -9,7 +9,6 @@ import { XgModule } from "./xg/xg.module";
 import { InjuriesModule } from "./injuries/injuries.module";
 import { CompetitionsModule } from "./competitions/competitions.module";
 import { FixturesModule } from "./fixtures/fixtures.module";
-import { ImportModule } from "./import/import.module";
 import { OddsModule } from "./odds/odds.module";
 import { AfImportModule } from "./import/af-import.module";
 
@@ -25,7 +24,6 @@ import { AfImportModule } from "./import/af-import.module";
     DecisionModule,
     CompetitionsModule,
     FixturesModule,
-    ImportModule,
     OddsModule,
     AfImportModule
   ],

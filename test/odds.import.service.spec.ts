@@ -51,7 +51,7 @@ describe('OddsImportService', () => {
       })
     });
 
-    const out = await svc.importUpcomingFromApiFootball('L1', 2025, 40, 30);
+    const out = await svc.importUpcomingFromApiFootball('L1', 2025, 40);
 
     // On accepte createMany OU create
     const createManyCount = prisma.odds.createMany.mock.calls?.length

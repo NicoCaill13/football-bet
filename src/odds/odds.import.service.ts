@@ -1,109 +1,147 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import { ApiFootballClient } from 'src/import/providers/api-football.client';
-import { toSlug } from "../common/slug.util";
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { ApiFootballClient } from 'src/common/api-football.client';
+import { AF_META } from 'src/import/af-import.service'; // <-- garde TON chemin
 
-type SaveOddsRow = { matchId: number; book: string; o1: number; oX: number; o2: number };
+type ImportSummary = {
+  provider: 'api-football';
+  league: string;
+  season: string;
+  scannedOdds: number;
+  rowsSaved: number;
+  skipped: number;
+  mode: 'by-fixture';
+};
+
+const url = process.env.API_FOOTBALL_BASE_URL || "url"
+
 
 @Injectable()
 export class OddsImportService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(OddsImportService.name);
+  private readonly afClient = new ApiFootballClient(url);
 
-  private parse1X2(odds: any | null): Array<{ book: string; o1: number; oX: number; o2: number }> {
-    if (!odds) return [];
+  constructor(private readonly prisma: PrismaService) {}
+
+  /** DB -> AF_META */
+  private async resolveAfLeagueId(codeRaw: string): Promise<number> {
+    const code = (codeRaw ?? '').toUpperCase().trim();
+    const comp = await this.prisma.competition.findFirst({ where: { code } });
+    if (comp?.afLeagueId) return comp.afLeagueId;
+    const meta = AF_META[code];
+    if (meta?.afLeagueId) return meta.afLeagueId;
+    throw new BadRequestException(`Unknown league code "${code}"`);
+  }
+
+  /** Parse 1X2 (Match Winner) : 1 row par bookmaker */
+  private parse1x2Rows(node: any): Array<{ book: string; o1: number; oX: number; o2: number }> {
     const out: Array<{ book: string; o1: number; oX: number; o2: number }> = [];
-    for (const bm of odds.bookmakers ?? []) {
-      const bet = bm.bets?.find((b: any) => /match winner|^1x2$/i.test(b.name));
+    const books = node?.bookmakers ?? [];
+    for (const b of books) {
+      const bet = (b?.bets ?? []).find((x: any) => /^(match winner|1x2)$/i.test(x?.name ?? ''));
       if (!bet) continue;
-      let o1: number | undefined, oX: number | undefined, o2: number | undefined;
-      for (const v of bet.values ?? []) {
-        const key = String(v.value).toUpperCase();
-        if (key === "HOME" || key === "1") o1 = Number(v.odd);
-        else if (key === "DRAW" || key === "X") oX = Number(v.odd);
-        else if (key === "AWAY" || key === "2") o2 = Number(v.odd);
-      }
-      if (typeof o1 === "number" && typeof oX === "number" && typeof o2 === "number") {
-        out.push({ book: bm.name, o1, oX, o2 });
+      const vals = bet.values ?? [];
+      const num = (v: any) => (v != null ? Number(v) : undefined);
+      const find = (label: string) => vals.find((v: any) => v?.value === label)?.odd;
+
+      const o1 = num(find('1') ?? find('Home'));
+      const oX = num(find('X') ?? find('Draw'));
+      const o2 = num(find('2') ?? find('Away'));
+      if ([o1, oX, o2].every((n) => typeof n === 'number' && !Number.isNaN(n))) {
+        out.push({ book: b.name, o1: o1 as number, oX: oX as number, o2: o2 as number });
       }
     }
     return out;
   }
 
-  private async findLocalMatchId(seasonId: number, homeName: string, awayName: string, isoDate: string) {
-    const homeSlug = toSlug(homeName);
-    const awaySlug = toSlug(awayName);
-    const home = await this.prisma.team.findFirst({ where: { slug: homeSlug } });
-    const away = await this.prisma.team.findFirst({ where: { slug: awaySlug } });
-    if (!home || !away) return null;
-    const t = new Date(isoDate).getTime();
-    const tMin = new Date(t - 2 * 3600_000);
-    const tMax = new Date(t + 2 * 3600_000);
-    const m = await this.prisma.match.findFirst({
-      where: { seasonId, homeTeamId: home.id, awayTeamId: away.id, startsAt: { gte: tMin, lte: tMax } },
-      select: { id: true },
-    });
-    return m?.id ?? null;
-  }
-
-  private async saveOddsBatch(rows: SaveOddsRow[]) {
-    for (const r of rows) {
-      await this.prisma.odds.create({
-        data: { matchId: r.matchId, book: r.book, o1: r.o1, oX: r.oX, o2: r.o2, sampledAt: new Date() },
-      });
+  /** Appel odds par fixture avec fallbacks selon l’impl du client */
+  private async fetchOddsByFixture(fixtureId: number): Promise<any> {
+    const anyClient = this.afClient as any;
+    if (typeof anyClient.odds === 'function') {
+      return anyClient.odds({ fixture: fixtureId });
     }
+    if (typeof anyClient.getOddsByFixture === 'function') {
+      return anyClient.getOddsByFixture(fixtureId);
+    }
+    if (typeof anyClient.get === 'function') {
+      return anyClient.get('odds', { fixture: fixtureId });
+    }
+    throw new Error('ApiFootballClient: no odds method available');
   }
 
-  async importUpcomingFromApiFootball(leagueCode: string, seasonYear: number, _next = 40, days?: number) {
-    const key = process.env.API_FOOTBALL_KEY;
-    if (!key) throw new NotFoundException("API_FOOTBALL_KEY manquant");
+  /**
+   * Import PRÉ-MATCH odds *par fixture* (PAS de `days`).
+   * - liste les prochains matches (DB) de la saison
+   * - GET /odds?fixture={afFixtureId}
+   * - insert 1 row Odds par bookmaker
+   */
+  async importUpcomingFromApiFootball(
+    leagueCodeRaw: string,
+    seasonYear: number,
+    next?: number, // défaut 40
+  ): Promise<ImportSummary> {
+    const code = (leagueCodeRaw ?? '').toUpperCase().trim();
+    if (!seasonYear || Number.isNaN(Number(seasonYear))) {
+      throw new BadRequestException(`Invalid season year "${seasonYear}"`);
+    }
 
-    const comp = await this.prisma.competition.findFirst({ where: { code: leagueCode } });
-    if (!comp) throw new NotFoundException(`Competition locale introuvable: ${leagueCode}`);
-    const leagueId = (comp as any).afLeagueId;
-    if (!leagueId) throw new NotFoundException(`afLeagueId manquant pour ${leagueCode} — lance d'abord l'import fixtures.`);
-
+    // Ligue + saison pour scoper la recherche de matches
+    await this.resolveAfLeagueId(code); // validateur (même si on n’en a pas besoin ensuite)
+    const comp = await this.prisma.competition.findFirst({ where: { code } });
     const seasonLabel = `${seasonYear}-${seasonYear + 1}`;
-    const season = await this.prisma.season.findFirst({ where: { competitionId: comp.id, label: seasonLabel } });
-    if (!season) throw new NotFoundException(`Season introuvable: ${leagueCode} ${seasonLabel}`);
+    const season = await this.prisma.season.findFirst({
+      where: { competitionId: comp?.id, label: seasonLabel },
+    });
+    if (!season) {
+      throw new BadRequestException(
+        `Season not found for ${code} ${seasonYear}. Import fixtures first.`,
+      );
+    }
 
-    const api = new ApiFootballClient(key);
+    const take = Math.max(next ?? 40, 1);
+    const matches = await this.prisma.match.findMany({
+      where: { seasonId: season.id, startsAt: { gte: new Date() } },
+      orderBy: { startsAt: 'asc' },
+      take,
+    });
 
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
-    const today = new Date();
-    const horizon = new Date(today.getTime() + (days ?? 30) * 86400000);
-    const fromISO = fmt(today), toISO = fmt(horizon);
+    let scanned = 0;
+    let saved = 0;
+    let skipped = 0;
 
-    let page = 1, totalPages = 1;
-    let saved = 0, skipped = 0, scannedOdds = 0;
+    for (const m of matches) {
+      if (!m.afFixtureId) { skipped++; continue; }
 
-    do {
-      const { results, paging } = await api.oddsRange(leagueId, seasonYear, fromISO, toISO, page);
-      totalPages = paging?.total || 1;
+      const res = await this.fetchOddsByFixture(m.afFixtureId);
+      const nodes: any[] = Array.isArray(res?.response) ? res.response : [];
+      if (!nodes.length) continue;
 
-      for (const o of results) {
-        const fxId: number | undefined = o?.fixture?.id;
-        if (!fxId) { skipped++; continue; }
+      const rows = this.parse1x2Rows(nodes[0]); // on prend le 1er bloc
+      scanned += rows.length;
 
-        let match = await this.prisma.match.findUnique({ where: { afFixtureId: fxId } });
-        if (!match) {
-          const f = await api.fixtureById(fxId);
-          if (f) {
-            const mid = await this.findLocalMatchId(season.id, f.teams.home.name, f.teams.away.name, f.fixture.date);
-            if (mid) {
-              await this.prisma.match.update({ where: { id: mid }, data: { afFixtureId: fxId } });
-              match = await this.prisma.match.findUnique({ where: { id: mid } });
-            }
-          }
-        }
-        if (!match) { skipped++; continue; }
-
-        const rows = this.parse1X2(o).map(r => ({ matchId: match!.id, ...r }));
-        if (rows.length) { await this.saveOddsBatch(rows); saved += rows.length; }
-        scannedOdds++;
+      for (const r of rows) {
+        await this.prisma.odds.create({
+          data: {
+            matchId: m.id,
+            book: r.book,
+            o1: r.o1,
+            oX: r.oX,
+            o2: r.o2,
+            sampledAt: new Date(),
+          },
+        });
+        saved++;
       }
-      page++;
-    } while (page <= totalPages);
+    }
 
-    return { provider: "api-football", league: leagueCode, season: seasonLabel, scannedOdds, rowsSaved: saved, skipped, mode: "odds-range", window: { from: fromISO, to: toISO } };
+    return {
+      provider: 'api-football',
+      league: code,
+      season: season.label,
+      scannedOdds: scanned,
+      rowsSaved: saved,
+      skipped,
+      mode: 'by-fixture',
+    };
   }
 }

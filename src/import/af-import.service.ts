@@ -1,12 +1,12 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { ApiFootballClient } from 'src/import/providers/api-football.client';
+import { ApiFootballClient } from 'src/common/api-football.client';
 import { toSlug } from "../common/slug.util";
 
 
 type CompetitionTypeValue = "league" | "cup" | "europe";
 
-const AF_META: Record<string, { afLeagueId: number; name: string; country?: string; type: CompetitionTypeValue }> = {
+export const AF_META: Record<string, { afLeagueId: number; name: string; country?: string; type: CompetitionTypeValue }> = {
   L1:  { afLeagueId: 61,  name: "Ligue 1",                        country: "FR", type: "league" },
   PL:  { afLeagueId: 39,  name: "Premier League",                 country: "GB", type: "league" },
   SA:  { afLeagueId: 135, name: "Serie A",                        country: "IT", type: "league" },
