@@ -5,7 +5,12 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    transform: true,         
+    transformOptions: { enableImplicitConversion: true },
+    forbidUnknownValues: false,
+  }));
 
   const config = new DocumentBuilder()
     .setTitle("SportsBot API")
