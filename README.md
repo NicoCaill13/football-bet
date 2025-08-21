@@ -25,7 +25,8 @@ PORT=3000
 
 # Import matches — football-data.org (v4)
 API_FOOTBALL_KEY=YOUR_TOKEN_HERE
-API_FOOTBALL_BASE_URL=https://v3.football.api-sports.io``` 
+API_FOOTBALL_BASE_URL=https://v3.football.api-sports.io
+
 ```
 
 
@@ -134,4 +135,50 @@ curl -s "http://localhost:3000/odds/upcoming?league=L1&season=2025" | jq
 curl -s "http://localhost:3000/matches/1/odds/fair?use=best" | jq
 curl -s "http://localhost:3000/matches/1/pick" | jq
 curl -s "http://localhost:3000/matches/1/decision-log" | jq
+```
+
+## 🔮 Prédiction 1X2 (simple)
+
+### Endpoint
+`GET /matches/:id/prediction/summary?odds=best|latest`
+
+- `odds` *(optionnel, default: `best`)*  
+  - `best` : meilleures cotes par issue (mix de books)
+  - `latest` : dernière ligne de cotes importée (photo la plus récente)
+
+### Ce que fait l’API
+1. Prend les **cotes 1X2** (1 / N / 2).
+2. Retire la **marge bookmaker** ⇒ **probas marché**.
+3. Applique des **tilts** (petits ajustements symétriques) :
+   - **Elo** : avantage si rating domicile > extérieur  
+   - **xG (forme)** : avantage si xG_for - xG_against (rolling 5) plus élevé  
+   - **Blessures** : avantage si l’adversaire a plus d’absents “out” (14j)  
+   - **Repos** : avantage si plus de jours de repos avant le match  
+   - **Draw bump (optionnel)** : gonfle légèrement le nul si match équilibré  
+4. Renormalise les probabilités **(p1+pX+p2=1)** et renvoie le **vainqueur prédit**.
+
+### Réponse (exemple)
+```json
+{
+  "match": { "id": 11, "home": "Marseille", "away": "Paris FC", "startsAt": "2025-08-23T15:00:00.000Z" },
+  "usingOdds": { "mode": "best", "o1": 1.42, "oX": 5.18, "o2": 9 },
+  "probabilities": {
+    "market":   { "p1": 0.6984, "pX": 0.1914, "p2": 0.1102 },
+    "adjusted": { "p1": 0.7253, "pX": 0.1796, "p2": 0.0951 }
+  },
+  "prediction": {
+    "winner": "1",
+    "winnerTeam": "Marseille",
+    "probability": 0.7253
+  },
+  "drivers": {
+    "weights": { "elo": 0.30, "xg": 0.15, "inj": 0.10, "rest": 0.05, "draw": 0.05 },
+    "elo":      { "home": 1500, "away": 1500, "delta": 0, "tilt": 0 },
+    "xg":       { "delta": 0, "tilt": 0 },
+    "injuries": { "outHome": 0, "outAway": 0, "delta": 0, "tilt": 0 },
+    "rest":     { "diffDays": 1.85, "tilt": 0.093 },
+    "drawBump": -0.009,
+    "totalDelta": 0.093
+  }
+}
 ```
