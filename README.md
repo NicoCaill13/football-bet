@@ -27,6 +27,28 @@ PORT=3000
 API_FOOTBALL_KEY=YOUR_TOKEN_HERE
 API_FOOTBALL_BASE_URL=https://v3.football.api-sports.io
 
+# Choix des cotes par défaut: best (meilleures par issue) vs latest (dernière photo)
+DECISION_USE_BEST_ODDS=true
+
+# Elo
+DECISION_ALPHA_ELO=0.30      # poids du différentiel Elo (par 100 pts)
+ELO_HOME_ADV=70              # avantage domicile en pts Elo (ajouté côté home)
+
+# xG (rolling)
+DECISION_ALPHA_XG=0.20       # poids du différentiel xG (clampé entre -2 et +2)
+XG_SPAN=5m                   # fenêtre rolling (clé "5" en DB). "5m" ou "5" fonctionnent
+
+# Blessures
+DECISION_ALPHA_INJ=0.15      # poids (outAway - outHome)
+INJ_LOOKBACK_DAYS=14         # fenêtre de comptage des "out" (jours)
+
+# (Optionnels avec valeurs par défaut)
+DECISION_ALPHA_REST=0.05     # poids diff de repos (jours), défaut 0.05 si absent
+DECISION_ALPHA_DRAW=0.05     # bump nul, défaut 0.05 si absent
+
+# Stake (utilisé par l’endpoint de décision si activé ailleurs)
+STAKE_BANKROLL_CAP=0.02
+
 ```
 
 
