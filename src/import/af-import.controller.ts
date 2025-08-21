@@ -3,7 +3,7 @@ import { ApiOperation, ApiParam, ApiTags } from "@nestjs/swagger";
 import { AfImportService } from "./af-import.service";
 
 @ApiTags("Import")
-@Controller("import/api-football")
+@Controller("import/matches")
 export class AfImportController {
   constructor(private readonly service: AfImportService) {}
 

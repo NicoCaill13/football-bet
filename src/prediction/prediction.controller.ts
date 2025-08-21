@@ -1,26 +1,23 @@
-import { Controller, Get, Param, Query, ParseIntPipe } from '@nestjs/common';
-import { ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { PredictionService } from './prediction.service';
-import { getDecisionConfig } from 'src/prediction/prediction.config'
+import { predictionConfig } from './prediction.config';
 
-
-@ApiTags('prediction')
 @Controller()
 export class PredictionController {
   constructor(private readonly svc: PredictionService) {}
 
+  // GET /matches/:id/prediction/summary?odds=best|latest|book:NAME
   @Get('matches/:id/prediction/summary')
-  @ApiQuery({ name: 'odds', required: false, enum: ['best','latest'], example: 'best' })
-  @ApiOkResponse({ description: 'Prédiction 1X2 simple (vainqueur + probas + paramètres)' })
-  predictSummary(
-    @Param('id', ParseIntPipe) id: number,
-    @Query('odds') odds?: 'best'|'latest',
-  ){
-    const cfg = getDecisionConfig();
-    const mode = odds === 'latest' || odds === 'best'
-      ? odds
-      : (cfg.useBestOdds ? 'best' : 'latest');
-    return this.svc.predictMatchSummary(id, mode);
+  async summary(
+    @Param('id') id: string,
+    @Query('odds') mode?: string,
+  ) {
+    return this.svc.getSummary(Number(id), mode);
   }
 
+  // Optionnel : exposer la config courante (pratique pour le debug UI)
+  @Get('prediction/config')
+  getConfig() {
+    return predictionConfig;
+  }
 }

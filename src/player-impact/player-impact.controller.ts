@@ -4,7 +4,7 @@ import { PlayerImpactService } from './player-impact.service';
 
 @ApiTags('import')
 // ✅ plus de collision : /import/players-impact/api-football/build
-@Controller('import/players-impact/api-football')
+@Controller('import/players-impact')
 export class PlayerImpactController {
   constructor(private readonly svc: PlayerImpactService) {}
 
