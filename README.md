@@ -144,9 +144,12 @@ curl -s -X POST "http://localhost:3000/import/api-football/UECL/2025" | jq  # Eu
 ## Import cotes
 
 ```bash
-curl -s -X POST "http://localhost:3000/odds/import/upcoming?league=L1&season=2025&days=30" | jq
-# OU : les 40 prochains matches enregistrés de la saison
 curl -s -X POST "http://localhost:3000/odds/import/upcoming?league=L1&season=2025&next=40" | jq
+curl -s -X POST "http://localhost:3000/odds/import/upcoming?league=PL&season=2025&next=40" | jq
+curl -s -X POST "http://localhost:3000/odds/import/upcoming?league=SA&season=2025&next=40" | jq
+curl -s -X POST "http://localhost:3000/odds/import/upcoming?league=LL&season=2025&next=40" | jq
+curl -s -X POST "http://localhost:3000/odds/import/upcoming?league=BUN&season=2025&next=40" | jq
+
 ```
 
 
