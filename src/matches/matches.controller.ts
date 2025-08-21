@@ -17,20 +17,22 @@ export class MatchesController {
     return this.service.create(dto);
   }
 
-  // @Get()
-  // @ApiOperation({ summary: "Lister les matchs" })
-  // @ApiOkResponse({ type: Object, isArray: true })
-  // findAll() {
-  //   return this.service.findAll();
-  // }
 
   @Get(":id")
   @ApiOperation({ summary: "Récupérer un match" })
   @ApiParam({ name: "id", type: Number })
+  @ApiQuery({ name: 'withImpact', required: false, example: '1' })
+  @ApiQuery({ name: 'impactTop', required: false, example: 5, type: Number })
   @ApiOkResponse({ type: Object })
   @ApiNotFoundResponse({ description: "Match not found" })
-  findOne(@Param("id", ParseIntPipe) id: number) {
-    return this.service.findOne(id);
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('withImpact') withImpact?: string,
+    @Query('impactTop') impactTop?: string,
+  ) {
+    return this.service.findOne(id, { 
+      withImpact: withImpact === '1', 
+      impactTop: Number(impactTop) || 5 });
   }
 
   @Patch(":id")

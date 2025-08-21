@@ -51,6 +51,8 @@ model Season {
   afSeasonYear Int?
 
   @@index([competitionId])
+  TeamPlayerSeason TeamPlayerSeason[]
+  PlayerImpact PlayerImpact[]
 }
 
 model Round {
@@ -81,6 +83,10 @@ model Team {
   injuries    InjuryReport[]
 
   // relations implicites via Match.homeTeam/awayTeam
+
+  TeamPlayerSeason TeamPlayerSeason[]
+
+  PlayerImpact PlayerImpact[]
 }
 
 model Match {
@@ -202,4 +208,49 @@ model WeatherSnapshot {
   precipMm  Float?
   updatedAt DateTime @default(now())
   match     Match    @relation(fields: [matchId], references: [id])
+}
+
+model Player {
+  id           Int                  @id @default(autoincrement())
+  afPlayerId   Int?                 @unique
+  name         String
+  position     String?
+  nationality  String?
+  createdAt    DateTime             @default(now())
+
+  teamSeasons  TeamPlayerSeason[]
+  impacts      PlayerImpact[]
+}
+
+model TeamPlayerSeason {
+  id        Int     @id @default(autoincrement())
+  teamId    Int
+  playerId  Int
+  seasonId  Int
+  shirtNo   Int?
+
+  team      Team    @relation(fields: [teamId], references: [id])
+  player    Player  @relation(fields: [playerId], references: [id])
+  season    Season  @relation(fields: [seasonId], references: [id])
+
+  @@unique([teamId, playerId, seasonId])
+}
+
+model PlayerImpact {
+  id        Int      @id @default(autoincrement())
+  teamId    Int
+  seasonId  Int
+  playerId  Int
+  span      String   // "10" pour rolling 10 matchs
+  minutes   Float
+  starts    Int
+  goalInv   Float    // buts+passes (ou xG+xA si tu préfères)
+  impact    Float    // score 0..1
+  updatedAt DateTime @updatedAt
+
+  team      Team     @relation(fields: [teamId], references: [id])
+  season    Season   @relation(fields: [seasonId], references: [id])
+  player    Player   @relation(fields: [playerId], references: [id])
+
+  @@unique([teamId, seasonId, playerId, span])
 }

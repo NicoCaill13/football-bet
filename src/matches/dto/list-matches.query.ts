@@ -34,4 +34,8 @@ export class ListMatchesQueryDto {
   })
   @IsOptional() @IsIn(['none', 'best', 'latest'])
   odds?: 'none' | 'best' | 'latest';
+
+  @IsOptional() @IsIn(['prediction', 'best', 'latest'])
+  with?: string; 
+  
 }

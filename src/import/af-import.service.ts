@@ -30,9 +30,8 @@ export class AfImportService {
   }
 
   async importLeagueSeason(leagueCode: string, seasonYear: number) {
-    const key = process.env.API_FOOTBALL_KEY;
-    if (!key) throw new NotFoundException("API_FOOTBALL_KEY manquant");
-    const api = new ApiFootballClient(key);
+    const host = process.env.API_FOOTBALL_BASE_URL;
+    const api = new ApiFootballClient(host);
 
     const meta = AF_META[leagueCode];
     if (!meta) throw new NotFoundException(`Aucun mapping meta pour "${leagueCode}"`);
@@ -73,7 +72,8 @@ export class AfImportService {
     }
 
     // Teams
-    const teams = await api.teams(leagueId, seasonYear);
+    const teamsRes = await api.teams(leagueId, seasonYear); // passe page=1 explicite
+    const teams = Array.isArray(teamsRes?.response) ? teamsRes.response : [];
     for (const t of teams) {
       const slug = toSlug(t.team.name);
       await this.prisma.team.upsert({
@@ -84,7 +84,8 @@ export class AfImportService {
     }
 
     // Fixtures
-    const fixtures = await api.fixturesSeason(leagueId, seasonYear);
+    const fixturesRes = await api.fixturesSeason(leagueId, seasonYear); // passe page=1 explicite
+    const fixtures = Array.isArray(fixturesRes?.response) ? fixturesRes.response : [];
     let created = 0, updated = 0;
 
     for (const f of fixtures) {

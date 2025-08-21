@@ -17,37 +17,40 @@ Phase 3 ajoute **Compétitions/Saisons/Rounds**, **Calendrier/Fixtures**, **repo
 
 Créez `.env` à partir de `.env.example`, puis ajoutez :
 ```ini
-# DB
+# --- API-FOOTBALL / RapidAPI ---
+AF_API_KEY=<TA_CLE_RAPIDAPI>
+AF_API_HOST=v3.football.api-sports.io
+
+# --- DB ---
 DATABASE_URL=postgresql://postgres:postgres@db:5432/sportsbot?schema=public
 
-# API (port conteneur)
-PORT=3000
-
-# Import matches — football-data.org (v4)
-API_FOOTBALL_KEY=YOUR_TOKEN_HERE
-API_FOOTBALL_BASE_URL=https://v3.football.api-sports.io
-
-# Choix des cotes par défaut: best (meilleures par issue) vs latest (dernière photo)
+# --- Choix des cotes (latest|best|book:NAME) ---
 DECISION_USE_BEST_ODDS=true
 
-# Elo
-DECISION_ALPHA_ELO=0.30      # poids du différentiel Elo (par 100 pts)
-ELO_HOME_ADV=70              # avantage domicile en pts Elo (ajouté côté home)
+# --- Elo ---
+DECISION_ALPHA_ELO=0.30
+ELO_HOME_ADV=70
 
-# xG (rolling)
-DECISION_ALPHA_XG=0.20       # poids du différentiel xG (clampé entre -2 et +2)
-XG_SPAN=5m                   # fenêtre rolling (clé "5" en DB). "5m" ou "5" fonctionnent
+# --- xG (forme récente) ---
+DECISION_ALPHA_XG=0.20
+XG_SPAN=5m
 
-# Blessures
-DECISION_ALPHA_INJ=0.15      # poids (outAway - outHome)
-INJ_LOOKBACK_DAYS=14         # fenêtre de comptage des "out" (jours)
+# --- Blessures (volumétrique, en attendant impact OUT) ---
+DECISION_ALPHA_INJ=0.15
+INJ_LOOKBACK_DAYS=14
 
-# (Optionnels avec valeurs par défaut)
-DECISION_ALPHA_REST=0.05     # poids diff de repos (jours), défaut 0.05 si absent
-DECISION_ALPHA_DRAW=0.05     # bump nul, défaut 0.05 si absent
+# --- Repos & Draw bump (si activés dans ton code) ---
+DECISION_ALPHA_REST=0.05
+DECISION_ALPHA_DRAW=0.05
 
-# Stake (utilisé par l’endpoint de décision si activé ailleurs)
+# --- Stake (Kelly plafonné) ---
 STAKE_BANKROLL_CAP=0.02
+
+# --- Player Impact (rolling) ---
+IMPACT_WEIGHT_MINUTES=0.55
+IMPACT_WEIGHT_STARTS=0.15
+IMPACT_WEIGHT_GOALINV=0.30
+PLAYER_IMPACT_SPAN=10m
 
 ```
 
@@ -153,13 +156,19 @@ curl -s -X POST "http://localhost:3000/odds/import/upcoming?league=BUN&season=20
 ```
 
 
-## Consulter 
+## Impact des joueurs 
 
 ```bash
-curl -s "http://localhost:3000/odds/upcoming?league=L1&season=2025" | jq
-curl -s "http://localhost:3000/matches/1/odds/fair?use=best" | jq
-curl -s "http://localhost:3000/matches/1/pick" | jq
-curl -s "http://localhost:3000/matches/1/decision-log" | jq
+curl -s -X POST \
+  "http://localhost:3000/import/players-impact/api-football/build?league=L1&season=2025" | jq
+```
+
+## Détails
+
+```bash
+curl -s "http://localhost:3000/matches/11?withImpact=1&impactTop=5" | jq
+curl -s "http://localhost:3000/matches/11/odds/fair?use=best" | jq
+curl -s "http://localhost:3000/matches/11/prediction/summary?odds=best" | jq
 ```
 
 ## 🔮 Prédiction 1X2 (simple)

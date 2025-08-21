@@ -1,4 +1,6 @@
+import { Logger } from "@nestjs/common";
 import axios, { AxiosInstance } from "axios";
+import { connect } from "rxjs";
 
  export type AfTeam = {
     team: { id: number; name: string; country?: string | null };
@@ -34,10 +36,9 @@ import axios, { AxiosInstance } from "axios";
 
   export class ApiFootballClient {
     private http: AxiosInstance;
-    constructor(baseURL = process.env.API_FOOTBALL_BASE_URL || 'https://v3.football.api-sports.io') {
+    constructor(baseURL = process.env.API_FOOTBALL_BASE_URL || `https://host`) {
 
-        const apiKey   = process.env.API_FOOTBALL_KEY;
-    
+      const apiKey   = process.env.API_FOOTBALL_KEY;
       this.http = axios.create({
         baseURL,
         headers: { "x-apisports-key": apiKey },
@@ -113,5 +114,15 @@ import axios, { AxiosInstance } from "axios";
       const arr: AfFixture[] = res.data?.response ?? [];
       return arr[0] ?? null;
     }
+
+// Effectif (squad) d’une équipe
+async playersSquad(params: { team: number }) {
+  return this.get('/players/squads', params);
+}
+
+// Stats joueurs (paginated)
+public async players(team: number, league: number, season: number, page?: number) {
+  return this.get('/players', { team, league, season, page });
+}
   }
   
