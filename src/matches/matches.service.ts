@@ -83,7 +83,43 @@ export class MatchesService {
     return this.prisma.match.update({ where: { id }, data });
   }
 
-  findOne(id: number) { return this.prisma.match.findUnique({ where: { id } }); }
+  async findOne(id: number, opts?: { withImpact?: boolean; impactTop?: number }) {
+    const m = await this.prisma.match.findUnique({
+      where: { id },
+      include: { homeTeam: true, awayTeam: true, season: true }, // ensure 'season' is included if available
+    });
+    if (!m) throw new NotFoundException(`Match ${id} introuvable`);
+  
+    let impact: any = undefined;
+    if (opts?.withImpact && m.season?.id) {
+      const top = Math.max(1, Math.min(10, opts.impactTop ?? 5));
+      const [homeImp, awayImp] = await Promise.all([
+        this.prisma.playerImpact.findMany({
+          where: { teamId: m.homeTeamId, seasonId: m.season.id, span: process.env.PLAYER_IMPACT_SPAN ? String((process.env.PLAYER_IMPACT_SPAN.match(/^(\d+)/)||[])[1] ?? '10') : '10' },
+          orderBy: { impact: 'desc' }, take: top,
+          include: { player: true },
+        }),
+        this.prisma.playerImpact.findMany({
+          where: { teamId: m.awayTeamId, seasonId: m.season.id, span: process.env.PLAYER_IMPACT_SPAN ? String((process.env.PLAYER_IMPACT_SPAN.match(/^(\d+)/)||[])[1] ?? '10') : '10' },
+          orderBy: { impact: 'desc' }, take: top,
+          include: { player: true },
+        }),
+      ]);
+      impact = {
+        home: homeImp.map(r => ({ playerId: r.playerId, name: r.player.name, pos: r.player.position, impact: r.impact, minutes: r.minutes, starts: r.starts, goalInv: r.goalInv })),
+        away: awayImp.map(r => ({ playerId: r.playerId, name: r.player.name, pos: r.player.position, impact: r.impact, minutes: r.minutes, starts: r.starts, goalInv: r.goalInv })),
+      };
+    }
+  
+    return {
+      id: m.id,
+      home: m.homeTeam?.name ?? null,
+      away: m.awayTeam?.name ?? null,
+      startsAt: m.startsAt,
+      ...(impact ? { playerImpact: impact } : {}),
+    };
+  }
+  
   findAll() { return this.prisma.match.findMany({ orderBy: { startsAt: "asc" } }); }
   remove(id: number) { return this.prisma.match.delete({ where: { id } }); }
 

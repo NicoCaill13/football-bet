@@ -11,6 +11,7 @@ import { FixturesModule } from "./fixtures/fixtures.module";
 import { OddsModule } from "./odds/odds.module";
 import { AfImportModule } from "./import/af-import.module";
 import { PredictionModule } from "./prediction/prediction.module";
+import { PlayerImpactModule } from "src/player-impact/player-impact.module";
 
 @Module({
   imports: [
@@ -25,7 +26,8 @@ import { PredictionModule } from "./prediction/prediction.module";
     FixturesModule,
     OddsModule,
     AfImportModule,
-    PredictionModule
+    PredictionModule,
+    PlayerImpactModule
   ],
 })
 export class AppModule {}

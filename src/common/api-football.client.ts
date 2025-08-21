@@ -113,5 +113,15 @@ import axios, { AxiosInstance } from "axios";
       const arr: AfFixture[] = res.data?.response ?? [];
       return arr[0] ?? null;
     }
+
+// Effectif (squad) d’une équipe
+async playersSquad(params: { team: number }) {
+  return this.get('/players/squads', params);
+}
+
+// Stats joueurs (paginated)
+public async players(team: number, league: number, season: number, page?: number) {
+  return this.get('/players', { team, league, season, page });
+}
   }
   
