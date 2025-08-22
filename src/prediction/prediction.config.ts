@@ -1,22 +1,31 @@
 export interface PredictionConfig {
   odds: { useBest: boolean };
   weights: {
-    elo: number; xg: number; inj: number; rest: number;
-    draw: number; congestion: number; lookahead: number;
+    elo: number;
+    xg: number;
+    inj: number;
+    rest: number;
+    draw: number;
+    congestion: number;
+    lookahead: number;
   };
   /** <<< AJOUT >>> */
   pickRule: 'prob' | 'ev';
   // ----------------
   elo: { homeAdv: number };
   xg: { span: string; spanKey: string };
-  injuries: { lookbackDays: number; defaultImpact: number; impactSpan: string; impactSpanKey: string };
+  injuries: {
+    lookbackDays: number;
+    defaultImpact: number;
+    impactSpan: string;
+    impactSpanKey: string;
+  };
   rest: { capDays: number };
   congestion: { windowDays: number; baseline: number; softMax: number };
   lookahead: { days: number };
   draw: { congestionBump: number };
   stake: { cap: number };
 }
-
 
 function toBool(v: string | undefined, def: boolean) {
   if (v === undefined) return def;
@@ -35,8 +44,8 @@ function spanKey(raw: string | undefined, fallback = '5m') {
 export const predictionConfig: PredictionConfig = {
   odds: { useBest: toBool(process.env.DECISION_USE_BEST_ODDS, true) },
   weights: {
-    elo: toNum(process.env.DECISION_ALPHA_ELO, 0.30),
-    xg: toNum(process.env.DECISION_ALPHA_XG, 0.20),
+    elo: toNum(process.env.DECISION_ALPHA_ELO, 0.3),
+    xg: toNum(process.env.DECISION_ALPHA_XG, 0.2),
     inj: toNum(process.env.DECISION_ALPHA_INJ, 0.15),
     rest: toNum(process.env.DECISION_ALPHA_REST, 0.05),
     draw: toNum(process.env.DECISION_ALPHA_DRAW, 0.05),
@@ -44,10 +53,13 @@ export const predictionConfig: PredictionConfig = {
     lookahead: toNum(process.env.DECISION_ALPHA_LOOKAHEAD, 0.05),
   },
   /** <<< AJOUT >>> */
-  pickRule: (process.env.PREDICTION_PICK_RULE === 'ev') ? 'ev' : 'prob',
+  pickRule: process.env.PREDICTION_PICK_RULE === 'ev' ? 'ev' : 'prob',
   // ----------------
   elo: { homeAdv: toNum(process.env.ELO_HOME_ADV, 70) },
-  xg: { span: process.env.XG_SPAN ?? '5m', spanKey: spanKey(process.env.XG_SPAN, '5m') },
+  xg: {
+    span: process.env.XG_SPAN ?? '5m',
+    spanKey: spanKey(process.env.XG_SPAN, '5m'),
+  },
   injuries: {
     lookbackDays: toNum(process.env.INJ_LOOKBACK_DAYS, 14),
     defaultImpact: toNum(process.env.INJ_DEFAULT_IMPACT, 0.12),

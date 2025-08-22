@@ -8,10 +8,7 @@ export class PredictionController {
 
   // GET /matches/:id/prediction/summary?odds=best|latest|book:NAME
   @Get('matches/:id/prediction/summary')
-  async summary(
-    @Param('id') id: string,
-    @Query('odds') mode?: string,
-  ) {
+  async summary(@Param('id') id: string, @Query('odds') mode?: string) {
     return this.svc.getSummary(Number(id), mode);
   }
 

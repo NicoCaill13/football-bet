@@ -1,22 +1,32 @@
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsIn, IsOptional, IsString } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsIn, IsOptional, IsString } from 'class-validator';
 
-type CompetitionTypeDto = "league" | "cup" | "europe";
+type CompetitionTypeDto = 'league' | 'cup' | 'europe';
 
 export class CreateCompetitionDto {
-  @ApiProperty() @IsString()
+  @ApiProperty()
+  @IsString()
   name!: string;
 
-  @ApiPropertyOptional() @IsOptional() @IsString()
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   code?: string;
 
-  @ApiPropertyOptional() @IsOptional() @IsString()
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   country?: string;
 
-  @ApiProperty({ enum: ["league", "cup", "europe"], enumName: "CompetitionType" })
-  @IsIn(["league", "cup", "europe"])
+  @ApiProperty({
+    enum: ['league', 'cup', 'europe'],
+    enumName: 'CompetitionType',
+  })
+  @IsIn(['league', 'cup', 'europe'])
   type!: CompetitionTypeDto;
 
-  @ApiPropertyOptional() @IsOptional() @IsString()
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   organizer?: string;
 }

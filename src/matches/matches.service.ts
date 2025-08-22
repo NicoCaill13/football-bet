@@ -1,8 +1,12 @@
-import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { Prisma, Match } from "@prisma/client";
-import { PrismaService } from "../prisma/prisma.service";
-import { CreateMatchDto } from "./dto/create-match.dto";
-import { UpdateMatchDto } from "./dto/update-match.dto";
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import { Prisma, Match } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateMatchDto } from './dto/create-match.dto';
+import { UpdateMatchDto } from './dto/update-match.dto';
 import { ListMatchesQueryDto } from './dto/list-matches.query';
 import { PredictionService } from 'src/prediction/prediction.service';
 
@@ -30,22 +34,31 @@ const MAX_TAKE = 200;
 const defaultTakeForLeague = (code?: string) => {
   const c = (code || '').toUpperCase();
   return c === 'L1' || c === 'BUN' ? 9 : 10;
-}
+};
 
 @Injectable()
 export class MatchesService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly prediction: PredictionService,) {}
+    private readonly prediction: PredictionService,
+  ) {}
 
-  private async resolveCompetitionId(input: { competitionId?: number; competition?: string | null; }) {
-    if (typeof input.competitionId === "number") return input.competitionId;
+  private async resolveCompetitionId(input: {
+    competitionId?: number;
+    competition?: string | null;
+  }) {
+    if (typeof input.competitionId === 'number') return input.competitionId;
     if (input.competition && input.competition.trim()) {
       const comp = await this.prisma.competition.findFirst({
-        where: { OR: [{ code: input.competition }, { name: input.competition }] },
+        where: {
+          OR: [{ code: input.competition }, { name: input.competition }],
+        },
         select: { id: true },
       });
-      if (!comp) throw new NotFoundException(`Competition introuvable: ${input.competition}`);
+      if (!comp)
+        throw new NotFoundException(
+          `Competition introuvable: ${input.competition}`,
+        );
       return comp.id;
     }
     return undefined;
@@ -57,19 +70,24 @@ export class MatchesService {
       homeTeamId: dto.homeTeamId,
       awayTeamId: dto.awayTeamId,
       startsAt: new Date(dto.startsAt),
-      status: dto.status ?? "scheduled",
+      status: dto.status ?? 'scheduled',
       venue: dto.venue ?? null,
       ...(competitionId !== undefined ? { competitionId } : {}),
       ...(dto.seasonId !== undefined ? { seasonId: dto.seasonId } : {}),
       ...(dto.roundId !== undefined ? { roundId: dto.roundId } : {}),
-      ...(dto.afFixtureId !== undefined ? { afFixtureId: dto.afFixtureId } : {}),
+      ...(dto.afFixtureId !== undefined
+        ? { afFixtureId: dto.afFixtureId }
+        : {}),
     };
     return this.prisma.match.create({ data });
   }
 
   async update(id: number, dto: UpdateMatchDto): Promise<Match> {
     let competitionId: number | undefined = undefined;
-    if (dto.competitionId !== undefined || (dto.competition && dto.competition.trim())) {
+    if (
+      dto.competitionId !== undefined ||
+      (dto.competition && dto.competition.trim())
+    ) {
       competitionId = await this.resolveCompetitionId(dto);
     }
     const data: Prisma.MatchUncheckedUpdateInput = {
@@ -81,39 +99,80 @@ export class MatchesService {
       ...(dto.startsAt ? { startsAt: new Date(dto.startsAt) } : {}),
       ...(dto.status ? { status: dto.status } : {}),
       ...(dto.venue !== undefined ? { venue: dto.venue } : {}),
-      ...(dto.afFixtureId !== undefined ? { afFixtureId: dto.afFixtureId } : {}),
+      ...(dto.afFixtureId !== undefined
+        ? { afFixtureId: dto.afFixtureId }
+        : {}),
     };
     return this.prisma.match.update({ where: { id }, data });
   }
 
-  async findOne(id: number, opts?: { withImpact?: boolean; impactTop?: number }) {
+  async findOne(
+    id: number,
+    opts?: { withImpact?: boolean; impactTop?: number },
+  ) {
     const m = await this.prisma.match.findUnique({
       where: { id },
       include: { homeTeam: true, awayTeam: true, season: true }, // ensure 'season' is included if available
     });
     if (!m) throw new NotFoundException(`Match ${id} introuvable`);
-  
+
     let impact: any = undefined;
     if (opts?.withImpact && m.season?.id) {
       const top = Math.max(1, Math.min(10, opts.impactTop ?? 5));
       const [homeImp, awayImp] = await Promise.all([
         this.prisma.playerImpact.findMany({
-          where: { teamId: m.homeTeamId, seasonId: m.season.id, span: process.env.PLAYER_IMPACT_SPAN ? String((process.env.PLAYER_IMPACT_SPAN.match(/^(\d+)/)||[])[1] ?? '10') : '10' },
-          orderBy: { impact: 'desc' }, take: top,
+          where: {
+            teamId: m.homeTeamId,
+            seasonId: m.season.id,
+            span: process.env.PLAYER_IMPACT_SPAN
+              ? String(
+                  (process.env.PLAYER_IMPACT_SPAN.match(/^(\d+)/) || [])[1] ??
+                    '10',
+                )
+              : '10',
+          },
+          orderBy: { impact: 'desc' },
+          take: top,
           include: { player: true },
         }),
         this.prisma.playerImpact.findMany({
-          where: { teamId: m.awayTeamId, seasonId: m.season.id, span: process.env.PLAYER_IMPACT_SPAN ? String((process.env.PLAYER_IMPACT_SPAN.match(/^(\d+)/)||[])[1] ?? '10') : '10' },
-          orderBy: { impact: 'desc' }, take: top,
+          where: {
+            teamId: m.awayTeamId,
+            seasonId: m.season.id,
+            span: process.env.PLAYER_IMPACT_SPAN
+              ? String(
+                  (process.env.PLAYER_IMPACT_SPAN.match(/^(\d+)/) || [])[1] ??
+                    '10',
+                )
+              : '10',
+          },
+          orderBy: { impact: 'desc' },
+          take: top,
           include: { player: true },
         }),
       ]);
       impact = {
-        home: homeImp.map(r => ({ playerId: r.playerId, name: r.player.name, pos: r.player.position, impact: r.impact, minutes: r.minutes, starts: r.starts, goalInv: r.goalInv })),
-        away: awayImp.map(r => ({ playerId: r.playerId, name: r.player.name, pos: r.player.position, impact: r.impact, minutes: r.minutes, starts: r.starts, goalInv: r.goalInv })),
+        home: homeImp.map((r) => ({
+          playerId: r.playerId,
+          name: r.player.name,
+          pos: r.player.position,
+          impact: r.impact,
+          minutes: r.minutes,
+          starts: r.starts,
+          goalInv: r.goalInv,
+        })),
+        away: awayImp.map((r) => ({
+          playerId: r.playerId,
+          name: r.player.name,
+          pos: r.player.position,
+          impact: r.impact,
+          minutes: r.minutes,
+          starts: r.starts,
+          goalInv: r.goalInv,
+        })),
       };
     }
-  
+
     return {
       id: m.id,
       home: m.homeTeam?.name ?? null,
@@ -122,14 +181,19 @@ export class MatchesService {
       ...(impact ? { playerImpact: impact } : {}),
     };
   }
-  
-  findAll() { return this.prisma.match.findMany({ orderBy: { startsAt: "asc" } }); }
-  remove(id: number) { return this.prisma.match.delete({ where: { id } }); }
+
+  findAll() {
+    return this.prisma.match.findMany({ orderBy: { startsAt: 'asc' } });
+  }
+  remove(id: number) {
+    return this.prisma.match.delete({ where: { id } });
+  }
 
   async list(query: ListMatchesQueryDto): Promise<MatchListItem[]> {
     try {
-      const { where, oddsMode, take, include, withPrediction } = this.buildQueryPieces(query); // <<< +withPrediction
-  
+      const { where, oddsMode, take, include, withPrediction } =
+        this.buildQueryPieces(query); // <<< +withPrediction
+
       // latest -> un seul round-trip DB
       if (oddsMode === 'latest') {
         const rows = await this.prisma.match.findMany({
@@ -138,13 +202,15 @@ export class MatchesService {
           take,
           include, // inclut odds triées + take:1
         });
-  
+
         const mapped = rows.map(this.formatWithLatest);
         if (!withPrediction || !rows.length) return mapped;
-  
+
         // prédictions en parallèle (même mode d’odds que la liste)
-        const preds = await Promise.all(rows.map(m => this.prediction.getSummary(m.id, 'latest')));
-  
+        const preds = await Promise.all(
+          rows.map((m) => this.prediction.getSummary(m.id, 'latest')),
+        );
+
         return mapped.map((m, i) => ({
           ...m,
           prediction: {
@@ -154,7 +220,7 @@ export class MatchesService {
           },
         }));
       }
-  
+
       // none/best -> 1) matches  2) (si best) groupBy Odds
       const rows = await this.prisma.match.findMany({
         where,
@@ -162,14 +228,16 @@ export class MatchesService {
         take,
         include: { homeTeam: true, awayTeam: true, round: true, season: true },
       });
-  
+
       if (!rows.length) return [];
-  
+
       if (oddsMode === 'none') {
         const bare = rows.map(this.formatBare);
         if (!withPrediction) return bare;
-  
-        const preds = await Promise.all(rows.map(m => this.prediction.getSummary(m.id, undefined)));
+
+        const preds = await Promise.all(
+          rows.map((m) => this.prediction.getSummary(m.id, undefined)),
+        );
         return bare.map((m, i) => ({
           ...m,
           prediction: {
@@ -179,7 +247,7 @@ export class MatchesService {
           },
         }));
       }
-  
+
       // oddsMode === 'best'
       const ids = rows.map((m) => m.id);
       const best = await this.prisma.odds.groupBy({
@@ -187,124 +255,147 @@ export class MatchesService {
         where: { matchId: { in: ids } },
         _max: { o1: true, oX: true, o2: true },
       });
-  
-      const mapBest = new Map<number, { o1: number | null; oX: number | null; o2: number | null }>();
+
+      const mapBest = new Map<
+        number,
+        { o1: number | null; oX: number | null; o2: number | null }
+      >();
       for (const row of best) {
-        mapBest.set(row.matchId, { o1: row._max.o1, oX: row._max.oX, o2: row._max.o2 });
+        mapBest.set(row.matchId, {
+          o1: row._max.o1,
+          oX: row._max.oX,
+          o2: row._max.o2,
+        });
       }
-  
-    // ... best ==>
-const mapped: MatchListItem[] = rows.map((m) => {
-  const b = mapBest.get(m.id);
-  const odds: MatchListItem['odds'] =
-    b && b.o1 != null && b.oX != null && b.o2 != null
-      ? { mode: 'best' as const, o1: b.o1!, oX: b.oX!, o2: b.o2! } // <<< as const
-      : null;
 
-  return {
-    id: m.id,
-    startsAt: m.startsAt,
-    round: m.round?.name ?? null,
-    season: m.season?.label ?? null,
-    home: m.homeTeam?.name ?? null,
-    away: m.awayTeam?.name ?? null,
-    odds,
-  };
-});
+      // ... best ==>
+      const mapped: MatchListItem[] = rows.map((m) => {
+        const b = mapBest.get(m.id);
+        const odds: MatchListItem['odds'] =
+          b && b.o1 != null && b.oX != null && b.o2 != null
+            ? { mode: 'best' as const, o1: b.o1!, oX: b.oX!, o2: b.o2! } // <<< as const
+            : null;
 
-if (!withPrediction) return mapped;
+        return {
+          id: m.id,
+          startsAt: m.startsAt,
+          round: m.round?.name ?? null,
+          season: m.season?.label ?? null,
+          home: m.homeTeam?.name ?? null,
+          away: m.awayTeam?.name ?? null,
+          odds,
+        };
+      });
 
-const preds = await Promise.all(rows.map(m => this.prediction.getSummary(m.id, 'best')));
-return mapped.map((m, i) => ({
-  ...m,
-  prediction: {
-    winner: preds[i].prediction.winner,
-    winnerTeam: preds[i].prediction.winnerTeam,
-    probability: preds[i].prediction.probability,
-  },
-}));
+      if (!withPrediction) return mapped;
 
+      const preds = await Promise.all(
+        rows.map((m) => this.prediction.getSummary(m.id, 'best')),
+      );
+      return mapped.map((m, i) => ({
+        ...m,
+        prediction: {
+          winner: preds[i].prediction.winner,
+          winnerTeam: preds[i].prediction.winnerTeam,
+          probability: preds[i].prediction.probability,
+        },
+      }));
     } catch (err) {
       throw new BadRequestException((err as Error).message);
     }
   }
-  
 
- /** Construit where/include/take/oddsMode à partir des query params (casting robuste) */
-private buildQueryPieces(query: ListMatchesQueryDto): {
-  where: Prisma.MatchWhereInput;
-  include?: Prisma.MatchInclude;
-  take: number;
-  oddsMode: OddsMode;
-  withPrediction: boolean; // <<< NEW
-} {
-  const code = query.league ? String(query.league).toUpperCase().trim() : undefined;
-  const seasonYear = query.season != null ? Number(query.season) : undefined;
-  const oddsMode: OddsMode = (query.odds as OddsMode) ?? 'none';
-  const scope: 'all' | 'upcoming' | 'past' = (query.scope as any) ?? 'all';
-
-  // --- NEW: parse du "with"
-  const withParam = (query as any).with ?? (query as any).include ?? (query as any).predict ?? (query as any).prediction;
-  const withSet = new Set(
-    String(withParam ?? '')
-      .split(',')
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean),
-  );
-  const withPrediction =
-    withSet.has('prediction') ||
-    withSet.has('pred') ||
-    withSet.has('p') ||
-    withParam === '1' ||
-    withParam === 'true';
-
-  if (query.season != null && Number.isNaN(seasonYear!)) {
-    throw new BadRequestException(`Invalid season year "${query.season}"`);
-  }
-
-  // filtre temps
-  const timeFilter: Prisma.DateTimeFilter = {};
-  const fromDate = query.from ? new Date(String(query.from)) : undefined;
-  const toDate = query.to ? new Date(String(query.to)) : undefined;
-  if (fromDate && !isNaN(fromDate.getTime())) timeFilter.gte = fromDate;
-  if (toDate && !isNaN(toDate.getTime())) timeFilter.lte = toDate;
-  if (!fromDate && !toDate && scope !== 'all') {
-    const now = new Date();
-    if (scope === 'upcoming') timeFilter.gte = now;
-    if (scope === 'past') timeFilter.lt = now;
-  }
-
-  // filtre relationnel direct (pas de requêtes préalables)
-  const seasonRel: Prisma.SeasonRelationFilter | Prisma.SeasonWhereInput = {};
-  if (code) (seasonRel as Prisma.SeasonWhereInput).competition = { code };
-  if (seasonYear != null) (seasonRel as Prisma.SeasonWhereInput).label = `${seasonYear}-${seasonYear + 1}`;
-
-  const where: Prisma.MatchWhereInput = {};
-  if (Object.keys(seasonRel).length) where.season = seasonRel as any;
-  if (Object.keys(timeFilter).length) where.startsAt = timeFilter;
-
-  const takeDefault = defaultTakeForLeague(code);
-  const take = Math.min(Math.max(Number(query.limit ?? takeDefault), 1), MAX_TAKE);
-
-  // include si latest
-  const include: Prisma.MatchInclude | undefined =
-    oddsMode === 'latest'
-      ? {
-          homeTeam: true,
-          awayTeam: true,
-          round: true,
-          season: true,
-          odds: {
-            orderBy: { sampledAt: 'desc' },
-            take: 1,
-            select: { o1: true, oX: true, o2: true, book: true, sampledAt: true },
-          },
-        }
+  /** Construit where/include/take/oddsMode à partir des query params (casting robuste) */
+  private buildQueryPieces(query: ListMatchesQueryDto): {
+    where: Prisma.MatchWhereInput;
+    include?: Prisma.MatchInclude;
+    take: number;
+    oddsMode: OddsMode;
+    withPrediction: boolean; // <<< NEW
+  } {
+    const code = query.league
+      ? String(query.league).toUpperCase().trim()
       : undefined;
+    const seasonYear = query.season != null ? Number(query.season) : undefined;
+    const oddsMode: OddsMode = (query.odds as OddsMode) ?? 'none';
+    const scope: 'all' | 'upcoming' | 'past' = (query.scope as any) ?? 'all';
 
-  return { where, include, take, oddsMode, withPrediction }; // <<< return flag
-}
+    // --- NEW: parse du "with"
+    const withParam =
+      (query as any).with ??
+      (query as any).include ??
+      (query as any).predict ??
+      (query as any).prediction;
+    const withSet = new Set(
+      String(withParam ?? '')
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean),
+    );
+    const withPrediction =
+      withSet.has('prediction') ||
+      withSet.has('pred') ||
+      withSet.has('p') ||
+      withParam === '1' ||
+      withParam === 'true';
 
+    if (query.season != null && Number.isNaN(seasonYear!)) {
+      throw new BadRequestException(`Invalid season year "${query.season}"`);
+    }
+
+    // filtre temps
+    const timeFilter: Prisma.DateTimeFilter = {};
+    const fromDate = query.from ? new Date(String(query.from)) : undefined;
+    const toDate = query.to ? new Date(String(query.to)) : undefined;
+    if (fromDate && !isNaN(fromDate.getTime())) timeFilter.gte = fromDate;
+    if (toDate && !isNaN(toDate.getTime())) timeFilter.lte = toDate;
+    if (!fromDate && !toDate && scope !== 'all') {
+      const now = new Date();
+      if (scope === 'upcoming') timeFilter.gte = now;
+      if (scope === 'past') timeFilter.lt = now;
+    }
+
+    // filtre relationnel direct (pas de requêtes préalables)
+    const seasonRel: Prisma.SeasonRelationFilter | Prisma.SeasonWhereInput = {};
+    if (code) (seasonRel as Prisma.SeasonWhereInput).competition = { code };
+    if (seasonYear != null)
+      (seasonRel as Prisma.SeasonWhereInput).label =
+        `${seasonYear}-${seasonYear + 1}`;
+
+    const where: Prisma.MatchWhereInput = {};
+    if (Object.keys(seasonRel).length) where.season = seasonRel as any;
+    if (Object.keys(timeFilter).length) where.startsAt = timeFilter;
+
+    const takeDefault = defaultTakeForLeague(code);
+    const take = Math.min(
+      Math.max(Number(query.limit ?? takeDefault), 1),
+      MAX_TAKE,
+    );
+
+    // include si latest
+    const include: Prisma.MatchInclude | undefined =
+      oddsMode === 'latest'
+        ? {
+            homeTeam: true,
+            awayTeam: true,
+            round: true,
+            season: true,
+            odds: {
+              orderBy: { sampledAt: 'desc' },
+              take: 1,
+              select: {
+                o1: true,
+                oX: true,
+                o2: true,
+                book: true,
+                sampledAt: true,
+              },
+            },
+          }
+        : undefined;
+
+    return { where, include, take, oddsMode, withPrediction }; // <<< return flag
+  }
 
   private formatBare = (m: any): MatchListItem => ({
     id: m.id,
@@ -321,12 +412,14 @@ private buildQueryPieces(query: ListMatchesQueryDto): {
       o && o.o1 != null && o.oX != null && o.o2 != null
         ? {
             mode: 'latest' as const, // <<< as const
-            o1: o.o1, oX: o.oX, o2: o.o2,
+            o1: o.o1,
+            oX: o.oX,
+            o2: o.o2,
             book: o.book ?? null,
             sampledAt: o.sampledAt ?? null,
           }
         : null;
-  
+
     return {
       id: m.id,
       startsAt: m.startsAt,
@@ -337,5 +430,4 @@ private buildQueryPieces(query: ListMatchesQueryDto): {
       odds,
     };
   };
-  
 }

@@ -4,7 +4,6 @@ import { ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('odds')
 @Controller('odds')
-
 export class OddsUpcomingController {
   constructor(private readonly importer: OddsImportService) {}
 

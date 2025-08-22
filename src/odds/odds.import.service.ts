@@ -13,8 +13,7 @@ type ImportSummary = {
   mode: 'by-fixture';
 };
 
-const url = process.env.API_FOOTBALL_BASE_URL || "url"
-
+const url = process.env.API_FOOTBALL_BASE_URL || 'url';
 
 @Injectable()
 export class OddsImportService {
@@ -34,21 +33,33 @@ export class OddsImportService {
   }
 
   /** Parse 1X2 (Match Winner) : 1 row par bookmaker */
-  private parse1x2Rows(node: any): Array<{ book: string; o1: number; oX: number; o2: number }> {
+  private parse1x2Rows(
+    node: any,
+  ): Array<{ book: string; o1: number; oX: number; o2: number }> {
     const out: Array<{ book: string; o1: number; oX: number; o2: number }> = [];
     const books = node?.bookmakers ?? [];
     for (const b of books) {
-      const bet = (b?.bets ?? []).find((x: any) => /^(match winner|1x2)$/i.test(x?.name ?? ''));
+      const bet = (b?.bets ?? []).find((x: any) =>
+        /^(match winner|1x2)$/i.test(x?.name ?? ''),
+      );
       if (!bet) continue;
       const vals = bet.values ?? [];
       const num = (v: any) => (v != null ? Number(v) : undefined);
-      const find = (label: string) => vals.find((v: any) => v?.value === label)?.odd;
+      const find = (label: string) =>
+        vals.find((v: any) => v?.value === label)?.odd;
 
       const o1 = num(find('1') ?? find('Home'));
       const oX = num(find('X') ?? find('Draw'));
       const o2 = num(find('2') ?? find('Away'));
-      if ([o1, oX, o2].every((n) => typeof n === 'number' && !Number.isNaN(n))) {
-        out.push({ book: b.name, o1: o1 as number, oX: oX as number, o2: o2 as number });
+      if (
+        [o1, oX, o2].every((n) => typeof n === 'number' && !Number.isNaN(n))
+      ) {
+        out.push({
+          book: b.name,
+          o1: o1 as number,
+          oX: oX as number,
+          o2: o2 as number,
+        });
       }
     }
     return out;
@@ -110,7 +121,10 @@ export class OddsImportService {
     let skipped = 0;
 
     for (const m of matches) {
-      if (!m.afFixtureId) { skipped++; continue; }
+      if (!m.afFixtureId) {
+        skipped++;
+        continue;
+      }
 
       const res = await this.fetchOddsByFixture(m.afFixtureId);
       const nodes: any[] = Array.isArray(res?.response) ? res.response : [];

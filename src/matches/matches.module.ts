@@ -1,6 +1,6 @@
-import { Module } from "@nestjs/common";
-import { MatchesController } from "./matches.controller";
-import { MatchesService } from "./matches.service";
+import { Module } from '@nestjs/common';
+import { MatchesController } from './matches.controller';
+import { MatchesService } from './matches.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PredictionModule } from 'src/prediction/prediction.module';
 

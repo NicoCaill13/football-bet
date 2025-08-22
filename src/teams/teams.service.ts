@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import { CreateTeamDto } from "./dto/create-team.dto";
-import { UpdateTeamDto } from "./dto/update-team.dto";
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateTeamDto } from './dto/create-team.dto';
+import { UpdateTeamDto } from './dto/update-team.dto';
 
 @Injectable()
 export class TeamsService {
@@ -12,12 +12,12 @@ export class TeamsService {
   }
 
   findAll() {
-    return this.prisma.team.findMany({ orderBy: { name: "asc" } });
+    return this.prisma.team.findMany({ orderBy: { name: 'asc' } });
   }
 
   async findOne(id: number) {
     const team = await this.prisma.team.findUnique({ where: { id } });
-    if (!team) throw new NotFoundException("Team not found");
+    if (!team) throw new NotFoundException('Team not found');
     return team;
   }
 

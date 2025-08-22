@@ -1,6 +1,12 @@
-import { Module } from "@nestjs/common";
-import { InjuriesController } from "./injuries.controller";
-import { InjuriesService } from "./injuries.service";
+import { Module } from '@nestjs/common';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { ApiFootballClient } from 'src/common/api-football.client';
+import { InjuriesImportController } from './injuries.controller';
+import { InjuriesImportService } from './injuries.service';
 
-@Module({ controllers: [InjuriesController], providers: [InjuriesService] })
-export class InjuriesModule {}
+@Module({
+  controllers: [InjuriesImportController],
+  providers: [PrismaService, ApiFootballClient, InjuriesImportService],
+  exports: [InjuriesImportService],
+})
+export class InjuriesImportModule {}

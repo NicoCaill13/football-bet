@@ -1,6 +1,6 @@
-import { Module } from "@nestjs/common";
-import { EloService } from "./elo.service";
-import { EloController } from "./elo.controller";
+import { Module } from '@nestjs/common';
+import { EloService } from './elo.service';
+import { EloController } from './elo.controller';
 
 @Module({
   controllers: [EloController],
