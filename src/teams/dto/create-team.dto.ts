@@ -1,17 +1,17 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsOptional, IsString } from "class-validator";
+import { ApiProperty } from '@nestjs/swagger';
+import { IsOptional, IsString } from 'class-validator';
 
 export class CreateTeamDto {
   @ApiProperty()
   @IsString()
   name!: string;
 
-  @ApiProperty({ example: "fr" })
+  @ApiProperty({ example: 'fr' })
   @IsOptional()
   @IsString()
   country?: string;
 
-  @ApiProperty({ example: "lille" })
+  @ApiProperty({ example: 'lille' })
   @IsString()
   slug!: string;
 }

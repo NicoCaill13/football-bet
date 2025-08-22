@@ -1,32 +1,40 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 import { ApiFootballClient } from 'src/common/api-football.client';
-import { toSlug } from "../common/slug.util";
+import { toSlug } from '../common/slug.util';
 
+type CompetitionTypeValue = 'league' | 'cup' | 'europe';
 
-type CompetitionTypeValue = "league" | "cup" | "europe";
-
-export const AF_META: Record<string, { afLeagueId: number; name: string; country?: string; type: CompetitionTypeValue }> = {
-  L1:  { afLeagueId: 61,  name: "Ligue 1",                        country: "FR", type: "league" },
-  PL:  { afLeagueId: 39,  name: "Premier League",                 country: "GB", type: "league" },
-  SA:  { afLeagueId: 135, name: "Serie A",                        country: "IT", type: "league" },
-  LL:  { afLeagueId: 140, name: "LaLiga",                         country: "ES", type: "league" },
-  BUN: { afLeagueId: 78,  name: "Bundesliga",                     country: "DE", type: "league" },
-  UCL: { afLeagueId: 2,   name: "UEFA Champions League",                          type: "cup"    },
-  UEL: { afLeagueId: 3,   name: "UEFA Europa League",                             type: "cup"    },
-  UECL:{ afLeagueId: 848, name: "UEFA Europa Conference League",                  type: "cup"    },
+export const AF_META: Record<
+  string,
+  {
+    afLeagueId: number;
+    name: string;
+    country?: string;
+    type: CompetitionTypeValue;
+  }
+> = {
+  L1: { afLeagueId: 61, name: 'Ligue 1', country: 'FR', type: 'league' },
+  PL: { afLeagueId: 39, name: 'Premier League', country: 'GB', type: 'league' },
+  SA: { afLeagueId: 135, name: 'Serie A', country: 'IT', type: 'league' },
+  LL: { afLeagueId: 140, name: 'LaLiga', country: 'ES', type: 'league' },
+  BUN: { afLeagueId: 78, name: 'Bundesliga', country: 'DE', type: 'league' },
+  UCL: { afLeagueId: 2, name: 'UEFA Champions League', type: 'cup' },
+  UEL: { afLeagueId: 3, name: 'UEFA Europa League', type: 'cup' },
+  UECL: { afLeagueId: 848, name: 'UEFA Europa Conference League', type: 'cup' },
 };
-
 
 @Injectable()
 export class AfImportService {
   constructor(private prisma: PrismaService) {}
 
-  private seasonLabel(year: number) { return `${year}-${year + 1}`; }
+  private seasonLabel(year: number) {
+    return `${year}-${year + 1}`;
+  }
   private parseRoundName(s?: string | null) {
     if (!s) return undefined;
     const m = s.match(/(\d+)/);
-    return m ? `Matchday ${m[1]}` : s.replace(/_/g, " ");
+    return m ? `Matchday ${m[1]}` : s.replace(/_/g, ' ');
   }
 
   async importLeagueSeason(leagueCode: string, seasonYear: number) {
@@ -34,18 +42,21 @@ export class AfImportService {
     const api = new ApiFootballClient(host);
 
     const meta = AF_META[leagueCode];
-    if (!meta) throw new NotFoundException(`Aucun mapping meta pour "${leagueCode}"`);
+    if (!meta)
+      throw new NotFoundException(`Aucun mapping meta pour "${leagueCode}"`);
     const leagueId = meta.afLeagueId;
 
     // Competition (création auto si absente)
-    let comp = await this.prisma.competition.findFirst({ where: { code: leagueCode } });
+    let comp = await this.prisma.competition.findFirst({
+      where: { code: leagueCode },
+    });
     if (!comp) {
       comp = await this.prisma.competition.create({
         data: {
           code: leagueCode,
           name: meta.name,
           country: meta.country,
-          type: meta.type,       
+          type: meta.type,
           afLeagueId: leagueId,
         },
       });
@@ -58,7 +69,9 @@ export class AfImportService {
 
     // Saison
     const label = this.seasonLabel(seasonYear);
-    let season = await this.prisma.season.findFirst({ where: { competitionId: comp.id, label } });
+    let season = await this.prisma.season.findFirst({
+      where: { competitionId: comp.id, label },
+    });
     if (!season) {
       season = await this.prisma.season.create({
         data: {
@@ -78,33 +91,56 @@ export class AfImportService {
       const slug = toSlug(t.team.name);
       await this.prisma.team.upsert({
         where: { slug },
-        update: { name: t.team.name, country: t.team.country ?? undefined, afTeamId: t.team.id },
-        create: { slug, name: t.team.name, country: t.team.country ?? undefined, afTeamId: t.team.id },
+        update: {
+          name: t.team.name,
+          country: t.team.country ?? undefined,
+          afTeamId: t.team.id,
+        },
+        create: {
+          slug,
+          name: t.team.name,
+          country: t.team.country ?? undefined,
+          afTeamId: t.team.id,
+        },
       });
     }
 
     // Fixtures
     const fixturesRes = await api.fixturesSeason(leagueId, seasonYear); // passe page=1 explicite
-    const fixtures = Array.isArray(fixturesRes?.response) ? fixturesRes.response : [];
-    let created = 0, updated = 0;
+    const fixtures = Array.isArray(fixturesRes?.response)
+      ? fixturesRes.response
+      : [];
+    let created = 0,
+      updated = 0;
 
     for (const f of fixtures) {
-      const home = await this.prisma.team.findFirst({ where: { afTeamId: f.teams.home.id } });
-      const away = await this.prisma.team.findFirst({ where: { afTeamId: f.teams.away.id } });
+      const home = await this.prisma.team.findFirst({
+        where: { afTeamId: f.teams.home.id },
+      });
+      const away = await this.prisma.team.findFirst({
+        where: { afTeamId: f.teams.away.id },
+      });
       if (!home || !away) continue;
 
       const roundName = this.parseRoundName(f.league.round) ?? undefined;
       let roundId: number | undefined;
       if (roundName) {
-        let round = await this.prisma.round.findFirst({ where: { seasonId: season.id, name: roundName, leg: null } });
-        if (!round) round = await this.prisma.round.create({ data: { seasonId: season.id, name: roundName, leg: null } });
+        let round = await this.prisma.round.findFirst({
+          where: { seasonId: season.id, name: roundName, leg: null },
+        });
+        if (!round)
+          round = await this.prisma.round.create({
+            data: { seasonId: season.id, name: roundName, leg: null },
+          });
         roundId = round.id;
       }
 
-      const status = (f.fixture.status?.short ?? "NS").toLowerCase();
+      const status = (f.fixture.status?.short ?? 'NS').toLowerCase();
       const venue = f.fixture.venue?.name ?? undefined;
 
-      const existing = await this.prisma.match.findUnique({ where: { afFixtureId: f.fixture.id } });
+      const existing = await this.prisma.match.findUnique({
+        where: { afFixtureId: f.fixture.id },
+      });
       const data = {
         competitionId: comp.id,
         seasonId: season.id,
@@ -117,10 +153,22 @@ export class AfImportService {
         afFixtureId: f.fixture.id,
       } as const;
 
-      if (existing) { await this.prisma.match.update({ where: { id: existing.id }, data }); updated++; }
-      else          { await this.prisma.match.create({ data });                                created++; }
+      if (existing) {
+        await this.prisma.match.update({ where: { id: existing.id }, data });
+        updated++;
+      } else {
+        await this.prisma.match.create({ data });
+        created++;
+      }
     }
 
-    return { provider: "api-football", league: leagueCode, season: label, fixtures: fixtures.length, created, updated };
+    return {
+      provider: 'api-football',
+      league: leagueCode,
+      season: label,
+      fixtures: fixtures.length,
+      created,
+      updated,
+    };
   }
 }

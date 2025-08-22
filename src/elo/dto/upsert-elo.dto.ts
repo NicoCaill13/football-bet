@@ -1,8 +1,8 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsInt, IsOptional, IsString } from "class-validator";
+import { ApiProperty } from '@nestjs/swagger';
+import { IsInt, IsOptional, IsString } from 'class-validator';
 
 export class UpsertEloDto {
-  @ApiProperty({ example: "lille", required: false })
+  @ApiProperty({ example: 'lille', required: false })
   @IsOptional()
   @IsString()
   teamSlug?: string;
@@ -16,7 +16,7 @@ export class UpsertEloDto {
   @IsInt()
   rating!: number;
 
-  @ApiProperty({ example: "clubelo", required: false })
+  @ApiProperty({ example: 'clubelo', required: false })
   @IsOptional()
   @IsString()
   source?: string;

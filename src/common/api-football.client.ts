@@ -1,63 +1,71 @@
-import { Logger } from "@nestjs/common";
-import axios, { AxiosInstance } from "axios";
-import { connect } from "rxjs";
+import { Logger } from '@nestjs/common';
+import axios, { AxiosInstance } from 'axios';
+import { connect } from 'rxjs';
 
- export type AfTeam = {
-    team: { id: number; name: string; country?: string | null };
+export type AfTeam = {
+  team: { id: number; name: string; country?: string | null };
+};
+
+export type AfFixture = {
+  fixture: {
+    id: number;
+    date: string;
+    timezone: string;
+    venue?: { name?: string | null } | null;
+    status?: { long?: string | null; short?: string | null } | null;
   };
-  
-  export type AfFixture = {
-    fixture: {
-      id: number;
-      date: string;
-      timezone: string;
-      venue?: { name?: string | null } | null;
-      status?: { long?: string | null; short?: string | null } | null;
-    };
-    league: { id: number; season: number; round?: string | null };
-    teams: { home: { id: number; name: string }, away: { id: number; name: string } };
+  league: { id: number; season: number; round?: string | null };
+  teams: {
+    home: { id: number; name: string };
+    away: { id: number; name: string };
   };
-  
-  export type OddsParams = {
-    fixture: { id: number };
-    league: { id: number; season: number };
-    date?: string; 
-    update?: string;
-    bookmakers: Array<{
+};
+
+export type OddsParams = {
+  fixture: { id: number };
+  league: { id: number; season: number };
+  date?: string;
+  update?: string;
+  bookmakers: Array<{
+    id: number;
+    name: string;
+    bets: Array<{
       id: number;
       name: string;
-      bets: Array<{
-        id: number;
-        name: string;
-        values: Array<{ value: "Home"|"Draw"|"Away"|"1"|"X"|"2"; odd: string }>;
+      values: Array<{
+        value: 'Home' | 'Draw' | 'Away' | '1' | 'X' | '2';
+        odd: string;
       }>;
     }>;
-  };
+  }>;
+};
 
-  export class ApiFootballClient {
-    private http: AxiosInstance;
-    constructor(baseURL = process.env.API_FOOTBALL_BASE_URL || `https://host`) {
+export class ApiFootballClient {
+  private http: AxiosInstance;
+  constructor(baseURL = process.env.API_FOOTBALL_BASE_URL || `https://host`) {
+    const apiKey = process.env.API_FOOTBALL_KEY;
+    this.http = axios.create({
+      baseURL,
+      headers: { 'x-apisports-key': apiKey },
+      timeout: 20000,
+    });
+  }
 
-      const apiKey   = process.env.API_FOOTBALL_KEY;
-      this.http = axios.create({
-        baseURL,
-        headers: { "x-apisports-key": apiKey },
-        timeout: 20000,
-      });
+  private clean(obj?: Record<string, any>) {
+    if (!obj) return undefined;
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (v === undefined || v === null || v === '') continue;
+      out[k] = v;
     }
+    return out;
+  }
 
-    private clean(obj?: Record<string, any>) {
-        if (!obj) return undefined;
-        const out: Record<string, any> = {};
-        for (const [k, v] of Object.entries(obj)) {
-          if (v === undefined || v === null || v === '') continue;
-          out[k] = v;
-        }
-        return out;
-      }
-
-    /** GET générique (retourne res.data brut de l’API) */
-  public async get<T = any>(path: string, params?: Record<string, any>): Promise<T> {
+  /** GET générique (retourne res.data brut de l’API) */
+  public async get<T = any>(
+    path: string,
+    params?: Record<string, any>,
+  ): Promise<T> {
     const res = await this.http.get(path, { params: this.clean(params) });
     return res.data as T;
   }
@@ -79,9 +87,9 @@ import { connect } from "rxjs";
     id?: number;
     league?: number;
     season?: number;
-    date?: string;      // YYYY-MM-DD
-    from?: string;      // YYYY-MM-DD
-    to?: string;        // YYYY-MM-DD
+    date?: string; // YYYY-MM-DD
+    from?: string; // YYYY-MM-DD
+    to?: string; // YYYY-MM-DD
     team?: number;
     round?: string;
     status?: string;
@@ -106,23 +114,43 @@ import { connect } from "rxjs";
 
   /** Obsolète: on laisse un message clair si un ancien appel persiste */
   public async oddsRange(_from: string, _to: string) {
-    throw new Error('oddsRange is not supported by API-FOOTBALL v3 /odds. Use odds({ fixture }) or odds({ date, league, season }).');
+    throw new Error(
+      'oddsRange is not supported by API-FOOTBALL v3 /odds. Use odds({ fixture }) or odds({ date, league, season }).',
+    );
   }
 
-    async fixtureById(id: number): Promise<AfFixture | null> {
-      const res = await this.http.get("/fixtures", { params: { id, timezone: "UTC" } });
-      const arr: AfFixture[] = res.data?.response ?? [];
-      return arr[0] ?? null;
-    }
-
-// Effectif (squad) d’une équipe
-async playersSquad(params: { team: number }) {
-  return this.get('/players/squads', params);
-}
-
-// Stats joueurs (paginated)
-public async players(team: number, league: number, season: number, page?: number) {
-  return this.get('/players', { team, league, season, page });
-}
+  async fixtureById(id: number): Promise<AfFixture | null> {
+    const res = await this.http.get('/fixtures', {
+      params: { id, timezone: 'UTC' },
+    });
+    const arr: AfFixture[] = res.data?.response ?? [];
+    return arr[0] ?? null;
   }
-  
+
+  // Effectif (squad) d’une équipe
+  async playersSquad(params: { team: number }) {
+    return this.get('/players/squads', params);
+  }
+
+  // Stats joueurs (paginated)
+  public async players(
+    team: number,
+    league: number,
+    season: number,
+    page?: number,
+  ) {
+    return this.get('/players', { team, league, season, page });
+  }
+
+  public async injuries(params: {
+    league?: number;
+    season?: number;
+    team?: number;
+    fixture?: number;
+    player?: number;
+    date?: string; // 'YYYY-MM-DD'
+    page?: number;
+  }) {
+    return this.get<any>('/injuries', params);
+  }
+}

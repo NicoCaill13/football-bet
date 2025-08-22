@@ -1,9 +1,9 @@
-import { Injectable } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
-import { PrismaService } from "../prisma/prisma.service";
-import { CreateCompetitionDto } from "./dto/create-competition.dto";
-import { CreateSeasonDto } from "./dto/create-season.dto";
-import { CreateRoundDto } from "./dto/create-round.dto";
+import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateCompetitionDto } from './dto/create-competition.dto';
+import { CreateSeasonDto } from './dto/create-season.dto';
+import { CreateRoundDto } from './dto/create-round.dto';
 
 @Injectable()
 export class CompetitionsService {
@@ -21,7 +21,7 @@ export class CompetitionsService {
   }
 
   listCompetitions() {
-    return this.prisma.competition.findMany({ orderBy: { name: "asc" } });
+    return this.prisma.competition.findMany({ orderBy: { name: 'asc' } });
   }
 
   createSeason(dto: CreateSeasonDto) {
@@ -31,19 +31,24 @@ export class CompetitionsService {
         label: dto.label,
         startDate: dto.startDate ? new Date(dto.startDate) : undefined,
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
-        ...(dto.afSeasonYear !== undefined ? { afSeasonYear: dto.afSeasonYear } : {}),
+        ...(dto.afSeasonYear !== undefined
+          ? { afSeasonYear: dto.afSeasonYear }
+          : {}),
       },
     });
   }
 
   listSeasons(competitionId: number) {
-    return this.prisma.season.findMany({ where: { competitionId }, orderBy: { id: "desc" } });
+    return this.prisma.season.findMany({
+      where: { competitionId },
+      orderBy: { id: 'desc' },
+    });
   }
 
   createRound(dto: CreateRoundDto) {
     const data: Prisma.RoundUncheckedCreateInput = {
       seasonId: dto.seasonId,
-      name: dto.name ?? (dto.roundNo ? `Matchday ${dto.roundNo}` : "Round"),
+      name: dto.name ?? (dto.roundNo ? `Matchday ${dto.roundNo}` : 'Round'),
       roundNo: dto.roundNo ?? null,
       leg: dto.leg ?? null,
     };
@@ -53,7 +58,7 @@ export class CompetitionsService {
   listRounds(seasonId: number) {
     return this.prisma.round.findMany({
       where: { seasonId },
-      orderBy: [{ roundNo: "asc" }, { id: "asc" }],
+      orderBy: [{ roundNo: 'asc' }, { id: 'asc' }],
     });
   }
 }

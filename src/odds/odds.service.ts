@@ -1,15 +1,17 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import { CreateOddsDto } from "./dto/create-odds.dto";
-import { devig, impliedFromOdds } from "../common/odds.util";
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateOddsDto } from './dto/create-odds.dto';
+import { devig, impliedFromOdds } from '../common/odds.util';
 
 @Injectable()
 export class OddsService {
   constructor(private prisma: PrismaService) {}
 
   async addSnapshot(matchId: number, dto: CreateOddsDto) {
-    const match = await this.prisma.match.findUnique({ where: { id: matchId } });
-    if (!match) throw new NotFoundException("Match not found");
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+    });
+    if (!match) throw new NotFoundException('Match not found');
 
     const rec = await this.prisma.odds.create({
       data: { matchId, book: dto.book, o1: dto.o1, oX: dto.oX, o2: dto.o2 },
@@ -21,12 +23,14 @@ export class OddsService {
   }
 
   async list(matchId: number) {
-    const match = await this.prisma.match.findUnique({ where: { id: matchId } });
-    if (!match) throw new NotFoundException("Match not found");
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+    });
+    if (!match) throw new NotFoundException('Match not found');
 
     const rows = await this.prisma.odds.findMany({
       where: { matchId },
-      orderBy: { sampledAt: "desc" },
+      orderBy: { sampledAt: 'desc' },
     });
 
     return rows.map((r) => {
@@ -39,7 +43,7 @@ export class OddsService {
   async latest(matchId: number) {
     const rows = await this.prisma.odds.findMany({
       where: { matchId },
-      orderBy: { sampledAt: "desc" },
+      orderBy: { sampledAt: 'desc' },
       take: 1,
     });
     if (!rows.length) return null;
@@ -52,14 +56,13 @@ export class OddsService {
   async best(matchId: number) {
     const rows = await this.prisma.odds.findMany({ where: { matchId } });
     if (!rows.length) return null;
-  
-    const o1 = Math.max(...rows.map(r => r.o1));
-    const oX = Math.max(...rows.map(r => r.oX));
-    const o2 = Math.max(...rows.map(r => r.o2));
-  
+
+    const o1 = Math.max(...rows.map((r) => r.o1));
+    const oX = Math.max(...rows.map((r) => r.oX));
+    const o2 = Math.max(...rows.map((r) => r.o2));
+
     const implied = impliedFromOdds(o1, oX, o2);
     const impliedNormalized = devig(implied);
     return { o1, oX, o2, implied, impliedNormalized };
   }
-  
 }
